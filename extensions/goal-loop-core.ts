@@ -140,6 +140,35 @@ export interface Goal {
 }
 
 /**
+ * Route `/goal` args (v0.8.0 top-level consolidation). Subcommands match ONLY
+ * on exact word (except tweak/archive which take args) — an objective that
+ * starts with "pause" ("/goal pause the pipeline and fix it") must set a
+ * goal, not pause one.
+ */
+export type GoalRoute =
+  | { kind: "draft" }
+  | { kind: "set"; text: string }
+  | { kind: "sub"; name: "status" | "pause" | "resume" | "cancel" | "tweak" | "archive"; rest: string };
+
+const GOAL_EXACT_SUBS = new Set(["status", "pause", "resume", "cancel"]);
+const GOAL_ARG_SUBS = new Set(["tweak", "archive"]);
+
+export function routeGoalArgs(raw: string): GoalRoute {
+  const trimmed = raw.trim();
+  if (!trimmed) return { kind: "draft" };
+  const space = trimmed.indexOf(" ");
+  const first = (space === -1 ? trimmed : trimmed.slice(0, space)).toLowerCase();
+  const rest = space === -1 ? "" : trimmed.slice(space + 1).trim();
+  if (GOAL_EXACT_SUBS.has(first) && rest === "") {
+    return { kind: "sub", name: first as "status" | "pause" | "resume" | "cancel", rest: "" };
+  }
+  if (GOAL_ARG_SUBS.has(first)) {
+    return { kind: "sub", name: first as "tweak" | "archive", rest };
+  }
+  return { kind: "set", text: trimmed };
+}
+
+/**
  * Layered settings merge (v0.7.0): later layers win, but only for keys they
  * actually define — an `undefined` value in a layer means "not set here",
  * never "set to undefined". Used for defaults → global → project resolution.

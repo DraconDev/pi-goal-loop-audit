@@ -1603,36 +1603,17 @@ function warnOnCommandCollision(ctx: ExtensionContext): void {
 export default function (pi: ExtensionAPI): void {
   extensionApi = pi;
   startHeartbeat();
+  // Four top-level commands, that's all (v0.8.0 consolidation):
+  //   /goal  — set/draft + status|pause|resume|cancel|tweak|archive subcommands
+  //   /list  — the queue (add|show|next|remove|clear)
+  //   /loop  — the metric loop (draft|start|status|stop)
+  //   /gla   — the settings UI (+ scriptable key=value)
   pi.registerCommand("goal", {
-    description: "Set a goal and start the loop now (no drafting). /goal <objective> [Done when: <verifier>]",
-    handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdSet(args, ctx); },
-  });
-  pi.registerCommand("goal-status", {
-    description: "Show current goal state.",
-    handler: (_args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdStatus(ctx); },
-  });
-  pi.registerCommand("goal-pause", {
-    description: "Pause the current goal.",
-    handler: (_args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdPause(ctx); },
-  });
-  pi.registerCommand("goal-resume", {
-    description: "Resume the current goal.",
-    handler: (_args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdResume(ctx); },
-  });
-  pi.registerCommand("goal-cancel", {
-    description: "Abort the current goal.",
-    handler: (_args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdCancel(ctx); },
-  });
-  pi.registerCommand("goal-tweak", {
-    description: "Edit the active goal's objective in place (Confirm dialog). /goal-tweak <new objective>",
-    handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdTweak(args, ctx); },
-  });
-  pi.registerCommand("goals", {
-    description: "List archived goals (newest first).",
-    handler: (_args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdGoals(ctx); },
+    description: "Set/draft a goal, or /goal status|pause|resume|cancel|tweak <text>|archive. Subcommands match exactly, so objectives starting with those words still work.",
+    handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdGoal(args, ctx); },
   });
   pi.registerCommand("gla", {
-    description: "The one config surface for goals, loops, lists, and the auditor. /gla [show] · /gla key=value · /gla project key=value",
+    description: "Open the settings UI for goals, loops, lists, and the auditor. Scriptable form: /gla key=value · /gla project key=value",
     handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdSettings(args, ctx); },
   });
   pi.registerCommand("list", {
