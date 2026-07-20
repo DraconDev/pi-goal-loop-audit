@@ -5,6 +5,40 @@ All notable changes to pi-goal-loop-audit are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] — 2026-07-20
+
+Draft everything. For a long-running thing, a draft up front is better —
+until now only `/goal` had drafting; `/list add` took raw strings, and
+`/loop start` demanded a correct target+measure+direction in one blind shot.
+
+### Added
+
+- **`/loop` drafting with measure test-run** (centerpiece): `/loop` with no
+  args starts a grilling turn about target + metric. When the agent calls
+  `propose_loop_draft`, the **orchestrator runs the proposed measure command
+  once** and shows the real output + parsed number in the Confirm dialog —
+  you validate the metric before a single iteration burns tokens. A measure
+  producing no number is auto-rejected back to the agent with its own output.
+- **`/list` drafting**: `/list add` with no args runs the same goal-drafting
+  flow, but the confirmed contract lands in the **queue** (auto-activates if
+  nothing is running). Drafting target is now unified: `goal | list | loop`.
+- **`/goals` archive browser**: newest-first list of archived goals with
+  status, objective head, and stop reason.
+
+### Changed
+
+- `/loop` with no args now drafts; `/loop status` is the explicit status path.
+
+### Verified live (2026-07-20)
+
+- Loop drafting: agent found `num.txt` itself, proposed `cat num.txt`, dialog
+  showed "Test-run output: 10 · Parsed number: 10 (lower is better)";
+  confirmed loop ran 10→9→8 improving.
+- List drafting: confirmed contract → `list_added` → auto-activated →
+  worked → audited → archived.
+- `/goals` parsing verified against real archive entries.
+- 89 unit tests green; `tsc --noEmit` clean.
+
 ## [0.5.0] — 2026-07-20
 
 Self-sufficiency release: the loop now owns its own liveness. A goal loop that

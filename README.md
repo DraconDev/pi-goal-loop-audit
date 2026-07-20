@@ -37,16 +37,25 @@ Use:
 /goal-cancel                       # abort
 /goal-tweak "<new objective>"      # edit in place (Confirm dialog)
 /goal-settings                     # auditor model + thinking + tokenlimit + notify
-/list add "<objective>"            # queue a goal
+/list add                         # draft a contract INTO the queue
+/list add "<objective>"            # queue directly
 /list                              # show active + queue
 /list next                         # skip current, activate next
 /list remove <n>                   # drop item n from the queue
 /list clear                        # empty the queue
+/loop                             # draft the loop (agent grills; measure is test-run before you confirm)
 /loop start "reduce TODOs" measure="grep -c TODO src.txt | head -1" direction=min
 /loop start "reduce TODOs" measure="..." direction=min branch=1   # scratch-branch mode
 /loop status                       # iteration, best, stall, recent values
 /loop stop                         # halt with summary
+/goals                             # archived goals, newest first
 ```
+
+**Drafting is the default for long-running things.** `/goal`, `/list add`, and
+`/loop` with no arguments all start a grilling turn that ends in a Confirm
+dialog. For `/loop` specifically, the orchestrator **test-runs the proposed
+measure command once** and shows the real number in the dialog — you validate
+the metric before a single iteration burns tokens.
 
 With `branch=1`, all work lands on a scratch branch (`pi-gla-loop/<ts>-<slug>`):
 improvements are committed, regressions are hard-reset (scratch branch only),

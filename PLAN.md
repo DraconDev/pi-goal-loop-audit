@@ -117,7 +117,7 @@ handles UX; smoke tests run under a bare `PI_CODING_AGENT_DIR` to isolate.
   notify commands; smoke `wait_for "plateau"` matched agent prose instead of
   the orchestrator's stop text (assertions raced the loop).
 
-### M6 — v0.6.0 (draft everything) — design
+### M6 — v0.6.0 (draft everything) ✅ (2026-07-20)
 
 User directive: for a long-running thing, a draft up front is better. Drafting
 exists only for `/goal`; `/list add` takes raw strings, and `/loop start`
@@ -142,6 +142,15 @@ confirming.
    objective head) from `.pi-gla/archive/`. Long-running tool needs history.
 4. Gates: unit tests (draft-mode routing, loop-draft measure parsing), smoke
    scenarios for loop-drafting and list-drafting, publish v0.6.0.
+
+**M6 evidence** (2026-07-20):
+- Loop drafting live: agent located num.txt itself, proposed `cat num.txt`;
+  Confirm dialog showed the real test-run ("Parsed number: 10, lower is
+  better"); confirmed loop ran improving iterations immediately.
+- List drafting live: confirmed contract → list_added → auto-activate →
+  audited → archived.
+- `/goals` parsing verified against real archive entries.
+- 89 unit tests, tsc clean.
 
 **Still deferred**: live footer/TUI widget (now the ONLY remaining scoreboard
 gap vs pi-loop-mode/pi-goal-x).
