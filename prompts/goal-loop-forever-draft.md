@@ -41,3 +41,10 @@ stops it.
 - Do not modify the repo while drafting.
 - Do not propose a measure you have not sanity-checked against the actual
   repo layout (read files first if unsure what exists).
+- **If the user's goal has no honest numeric metric — research, writing a
+  document, building a feature, "understand X" — say so plainly and redirect:
+  `/loop` only believes a number; `/goal` is the right tool because its
+  independent auditor verifies semantic completeness against a contract.
+  Offer to hand them a well-structured `/goal` objective instead. Never
+  invent a fake metric (word count alone, file exists) just to make a loop
+  fit — a number that doesn't track the real target is worse than no number.

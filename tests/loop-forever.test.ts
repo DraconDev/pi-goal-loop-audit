@@ -185,6 +185,13 @@ test("parseLoopStartArgs: branch=1 / branch=true enable branch mode", () => {
   assert.equal(parseLoopStartArgs('t measure="cat x" direction=min branch=0').branch, false);
 });
 
+test("parseLoopStartArgs: force flag off by default, on with 1/true", () => {
+  assert.equal(parseLoopStartArgs('t measure="cat x" direction=min').force, false);
+  assert.equal(parseLoopStartArgs('t measure="cat x" direction=min force=1').force, true);
+  assert.equal(parseLoopStartArgs('t measure="cat x" direction=min force=true').force, true);
+  assert.equal(parseLoopStartArgs('t measure="cat x" direction=min force=0').force, false);
+});
+
 // ---- loopBranchName ----
 
 test("loopBranchName: format is pi-gla-loop/<timestamp>-<slug>", () => {

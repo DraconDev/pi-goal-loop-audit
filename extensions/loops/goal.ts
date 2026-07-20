@@ -816,6 +816,7 @@ interface LoopConfig {
   plateauWindow: number;
   maxIterations: number;
   branch: boolean;
+  force?: boolean;
 }
 
 /** Shared loop-start path: /loop start AND propose_loop_draft (after Confirm). */
@@ -935,7 +936,10 @@ async function cmdLoop(args: string, ctx: ExtensionContext): Promise<void> {
     try {
       cfg = parseLoopStartArgs(rest);
     } catch (err) {
-      ctx.ui.notify(`/loop start: ${err instanceof Error ? err.message : String(err)}`, "warning");
+      ctx.ui.notify(
+        `/loop start: ${err instanceof Error ? err.message : String(err)}\n(Non-numeric goal — research, docs, features? Use /goal: the auditor verifies semantically. /loop only believes a number. Or /loop with no args to draft.)`,
+        "warning",
+      );
       return;
     }
     await startLoopFromConfig(ctx, cfg);

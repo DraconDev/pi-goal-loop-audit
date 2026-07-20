@@ -5,6 +5,20 @@ All notable changes to pi-goal-loop-audit are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] — 2026-07-20
+
+### Fixed (footguns found by real use)
+
+- **Direct `/loop start` refuses a no-number baseline.** Previously a broken
+  measure started with a null baseline and burned stall iterations until
+  plateau. Now it fails fast with the raw output and a fix hint; `force=1`
+  overrides for measures that only work after the agent builds something first.
+- **Redirect guidance for non-numeric goals**: `/loop start` parse errors and
+  the refusal now say plainly — research/docs/features belong in `/goal` (the
+  auditor verifies semantically); `/loop` only believes a number. The loop
+  drafting prompt has the same rule and offers to hand over a well-structured
+  `/goal` objective instead of inventing a fake metric.
+
 ## [0.6.0] — 2026-07-20
 
 Draft everything. For a long-running thing, a draft up front is better —
