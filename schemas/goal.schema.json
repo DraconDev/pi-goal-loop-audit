@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/dracon/pi-goal-loop-audit/main/schemas/goal.schema.json",
+  "title": "Goal",
+  "description": "Active goal state for pi-goal-loop-audit v0.1.0 (loop 1 only).",
+  "type": "object",
+  "required": ["id", "objective", "status", "policy", "createdAt", "updatedAt"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier for the active goal. Format: <iso8601>-<random6>."
+    },
+    "objective": {
+      "type": "string",
+      "minLength": 1,
+      "description": "User-written goal. Treated as untrusted data by the auditor."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "auditing", "complete", "paused", "aborted"]
+    },
+    "policy": {
+      "type": "string",
+      "enum": ["oracle"],
+      "description": "v0.1.0 only supports 'oracle' (loop 1). Loop 2 and loop 3 land in v0.2.0+."
+    },
+    "verificationContract": {
+      "type": "string",
+      "description": "Optional structured set of must-verify items extracted from the objective (e.g. 'Run npm test (0 failures)').",
+      "default": ""
+    },
+    "autoContinue": {
+      "type": "boolean",
+      "default": true
+    },
+    "taskList": {
+      "type": "object",
+      "description": "Optional sub-task list with validation.",
+      "required": ["version", "tasks"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "integer", "const": 1 },
+        "tasks": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/task" }
+        }
+      }
+    },
+    "auditHistory": {
+      "type": "array",
+      "description": "Each item is one auditor verdict (passed or not).",
+      "items": {
+        "type": "object",
+        "required": ["at", "approved", "disapproved", "model"],
+        "additionalProperties": false,
+        "properties": {
+          "at": { "type": "string", "format": "date-time" },
+          "approved": { "type": "boolean" },
+          "disapproved": { "type": "boolean" },
+          "model": { "type": "string" },
+          "thinkingLevel": { "type": "string" },
+          "report": { "type": "string" }
+        }
+      }
+    },
+    "stopReason": {
+      "type": "string",
+      "description": "Recorded by orchestrator on pause/abort/complete."
+    },
+    "pauseReason": {
+      "type": "string",
+      "description": "User-or-agent supplied reason for pause."
+    },
+    "pauseSuggestedAction": {
+      "type": "string",
+      "description": "Agent's suggestion when calling pause_goal."
+    },
+    "activePath": {
+      "type": "string",
+      "description": "Path to the .pi-gla/goals/<id>.md file."
+    },
+    "archivedPath": {
+      "type": "string"
+    },
+    "usage": {
+      "type": "object",
+      "required": ["tokensUsed", "tokensLimit"],
+      "additionalProperties": false,
+      "properties": {
+        "tokensUsed": { "type": "integer", "minimum": 0 },
+        "tokensLimit": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  },
+  "definitions": {
+    "task": {
+      "type": "object",
+      "required": ["id", "title", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "in_progress", "complete"]
+        },
+        "subtasks": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/task" }
+        }
+      }
+    }
+  }
+}
