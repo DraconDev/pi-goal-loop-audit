@@ -550,7 +550,8 @@ async function cmdList(args: string, ctx: ExtensionContext): Promise<void> {
       raw = raw.slice(1, -1).trim();
     }
     if (!raw) {
-      ctx.ui.notify("Usage: /list add <objective with optional 'Done when: ...' clause>", "info");
+      // /list add with no args → draft a confirmed contract INTO THE QUEUE.
+      startDrafting(ctx, "list");
       return;
     }
     const { objective, verificationContract } = extractVerificationContract(raw);
@@ -784,10 +785,21 @@ async function cmdLoop(args: string, ctx: ExtensionContext): Promise<void> {
   const sub = (parts[0] ?? "").toLowerCase();
   const rest = args.trim().slice(sub.length).trim();
 
-  if (!sub || sub === "status") {
+  if (!sub) {
+    // /loop with no args → draft the loop config (metric design is the whole
+    // game for a long-running loop; never start one blind).
+    if (isLoopActive()) {
+      ctx.ui.notify("A loop is already active — /loop status to inspect, /loop stop to end it.", "info");
+      return;
+    }
+    startDrafting(ctx, "loop");
+    return;
+  }
+
+  if (sub === "status") {
     const loop = state.loop;
     if (!loop) {
-      ctx.ui.notify("No loop. /loop start \"<target>\" measure=\"<cmd>\" direction=min|max [window=5] [max=50]", "info");
+      ctx.ui.notify("No loop. /loop to draft one, or /loop start \"<target>\" measure=\"<cmd>\" direction=min|max [window=5] [max=50]", "info");
       return;
     }
     const lines = [
