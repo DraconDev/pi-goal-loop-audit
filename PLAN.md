@@ -117,6 +117,34 @@ handles UX; smoke tests run under a bare `PI_CODING_AGENT_DIR` to isolate.
   notify commands; smoke `wait_for "plateau"` matched agent prose instead of
   the orchestrator's stop text (assertions raced the loop).
 
+### M5 — v0.5.0 (self-sufficiency) — design
+
+User directive: a goal loop that dies silently after compaction and needs an
+EXTERNAL plugin (`@badliveware/pi-compaction-continue`) to restart it is a hole
+in OUR plugin. Liveness is the loop's own job. Bake it in; cut the watchdog.
+
+1. **Heartbeat self-watchdog** (replaces pi-compaction-continue for our loops):
+   a 15s interval checks: active goal-or-loop AND session idle AND no pending
+   continuation/loop timer AND no activity for 60s → re-fire the continuation.
+   One check covers every stall cause (compaction-eaten turn, dropped message,
+   stale ctx). Stall accounting: a heartbeat-nudged turn with ZERO tool calls
+   counts as a nudge; 3 consecutive → pause (mirrors the watchdog's 3-nudge cap,
+   but scoped to real goal progress). Pure decision function unit-tested.
+   Scope note: this covers stalls while a goal/loop is active. Non-goal sessions
+   are the user's own business — they are at the keyboard.
+2. **`/goal-tweak "<text>"`** — edit the active goal's objective in place
+   (Confirm dialog shows old vs new; contract re-extracted from the new text).
+   Closes the last pi-goal-x feature gap we use.
+3. **Structured drafting forms**: drafting prompt prefers `ask_user_question`
+   (rpiv-ask-user-question) when the tool is available in the session — closes
+   the structured-forms gap vs pi-goal-x without a hard dependency.
+4. **Rig cuts** (after publish): `pi-codex-goal`, `pi-loop-mode`,
+   `@badliveware/pi-compaction-continue`. AGENTS.md stack table rewritten:
+   goal plane = pi-goal-loop-audit.
+
+**Deferred**: live footer/TUI widget (pi-loop-mode's dashboard is the one thing
+we genuinely lose by cutting it; v0.6.0 candidate if missed).
+
 ### M4 — v0.4.0 (completion release) ✅ (2026-07-20)
 
 Everything left, in one release. Completes the 6-flaw list and makes the docs honest.

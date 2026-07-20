@@ -54,3 +54,46 @@ export function humanMs(ms: number): string {
   if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
   return `${Math.round(ms / 60_000)}m`;
 }
+
+// =================================================================
+// Heartbeat self-watchdog (v0.5.0)
+//
+// Replaces the external pi-compaction-continue plugin FOR OUR LOOPS. A goal
+// loop that dies silently (compaction-eaten turn, dropped message, stale ctx)
+// is a hole in this plugin, not something to outsource. One precise check
+// covers every stall cause: supervising + idle + nothing scheduled + quiet
+// for too long → re-fire the continuation ourselves.
+// =================================================================
+
+export const HEARTBEAT_INTERVAL_MS = 15_000;
+export const HEARTBEAT_STALL_MS = 60_000;
+export const HEARTBEAT_MAX_NUDGES = 3;
+
+export interface HeartbeatInput {
+  /** A goal is active (autoContinue) or a loop is running. */
+  supervising: boolean;
+  /** ctx.isIdle() && !ctx.hasPendingMessages() */
+  sessionIdle: boolean;
+  /** A continuation or loop timer is already scheduled. */
+  timerPending: boolean;
+  /** Milliseconds since the last observed agent activity. */
+  msSinceActivity: number;
+  stallMs?: number;
+}
+
+/** Should the heartbeat re-fire the continuation right now? */
+export function shouldHeartbeatRefire(input: HeartbeatInput): boolean {
+  if (!input.supervising) return false;
+  if (!input.sessionIdle) return false;
+  if (input.timerPending) return false;
+  return input.msSinceActivity >= (input.stallMs ?? HEARTBEAT_STALL_MS);
+}
+
+/**
+ * Judge a finished turn for nudge accounting. A supervising turn with zero
+ * tool calls produced no real progress — that is a nudge. Anything with a
+ * tool call resets the counter. Returns the new consecutive-nudge count.
+ */
+export function accountTurnForNudges(toolCalls: number, currentNudges: number): number {
+  return toolCalls > 0 ? 0 : currentNudges + 1;
+}

@@ -1,0 +1,43 @@
+# GitHub Sponsors / community funding configuration.
+#
+# GitHub discovers this file at .github/FUNDING.yml in a repository and uses it
+# to render a "Sponsor" button on the repo page. See:
+#   https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+#
+# The Dracon-managed sync policy opts in to this template. External users of
+# dracon-sync do not receive it unless they explicitly add the long-form
+# standard_files entry for .github/FUNDING.yml.
+#
+# The default is intentionally empty so a freshly-scaffolded repo advertises
+# no funding destinations until the operator explicitly fills them in.
+# Replace the example entries below with real ones (GitHub Sponsors, Open
+# Collective, Patreon, Ko-fi, Liberapay, IssueHunt, custom URL, etc).
+#
+# Supported top-level keys (see GitHub docs for the full list):
+#   github:    [username1, username2, ...]
+#   patreon:   username
+#   open_collective: collective-slug
+#   ko_fi:     username
+#   tidelift:  platform/username
+#   community_bridge: project-slug
+#   liberapay: username
+#   issuehunt: username
+#   otechie:   username
+#   custom:    ["https://example.com/donate", ...]
+#   buy_me_a_coffee: username
+#
+# This file is public, version-controlled, and contains no secrets. Do not
+# place API keys, tokens, account passwords, or any other secret material
+# here. The Warden key-management layer treats this file as plain text.
+
+github: []
+patreon:
+open_collective:
+ko_fi:
+tidelift:
+community_bridge:
+liberapay:
+issuehunt:
+otechie:
+custom: []
+buy_me_a_coffee:
