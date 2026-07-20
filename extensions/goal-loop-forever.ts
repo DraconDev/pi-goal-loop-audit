@@ -114,6 +114,7 @@ export function parseLoopStartArgs(raw: string): {
   plateauWindow: number;
   maxIterations: number;
   branch: boolean;
+  force: boolean;
 } {
   // Key=value pairs first (measure= and direction= may hold quoted values),
   // the remaining text is the target.
@@ -145,6 +146,7 @@ export function parseLoopStartArgs(raw: string): {
   const window = Number.parseInt(kv.get("window") ?? "", 10);
   const max = Number.parseInt(kv.get("max") ?? "", 10);
   const branchRaw = (kv.get("branch") ?? "").toLowerCase();
+  const forceRaw = (kv.get("force") ?? "").toLowerCase();
   return {
     target,
     measureCmd,
@@ -152,5 +154,6 @@ export function parseLoopStartArgs(raw: string): {
     plateauWindow: Number.isFinite(window) && window > 0 ? window : LOOP_DEFAULTS.plateauWindow,
     maxIterations: Number.isFinite(max) && max > 0 ? max : LOOP_DEFAULTS.maxIterations,
     branch: branchRaw === "1" || branchRaw === "true" || branchRaw === "yes",
+    force: forceRaw === "1" || forceRaw === "true" || forceRaw === "yes",
   };
 }

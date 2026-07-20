@@ -844,8 +844,18 @@ async function startLoopFromConfig(ctx: ExtensionContext, cfg: LoopConfig): Prom
       return false;
     }
   }
-  // Baseline measurement before the first agent turn.
+  // Baseline measurement before the first agent turn. A measure that
+  // produces no number is a footgun: without a baseline the loop burns stall
+  // iterations before plateau stops it. Refuse fast (force=1 overrides for
+  // measures that only work after the agent builds something first).
   const baseline = await runMeasure(ctx, cfg.measureCmd);
+  if (baseline === null && !(cfg as { force?: boolean }).force) {
+    ctx.ui.notify(
+      `/loop start refused: the measure produced no number.\nCommand: ${cfg.measureCmd}\nFix it so it prints exactly one number, or re-run with force=1 if it only works after the agent builds something first.\n(Non-numeric goal — research, docs, features? Use /goal: the independent auditor verifies semantically. /loop only believes a number.)`,
+      "warning",
+    );
+    return false;
+  }
   state = {
     ...state,
     loop: {
@@ -868,7 +878,7 @@ async function startLoopFromConfig(ctx: ExtensionContext, cfg: LoopConfig): Prom
   persistState(ctx);
   appendLedger(ctx.cwd, "loop_started", { target: cfg.target, measureCmd: cfg.measureCmd, direction: cfg.direction, baseline, branch: branchName });
   ctx.ui.notify(
-    `Loop started: ${cfg.target.slice(0, 60)}\nBaseline: ${baseline ?? "(measure produced no number — first turn must fix that)"} · direction ${cfg.direction} · window ${cfg.plateauWindow} · max ${cfg.maxIterations}` +
+    `Loop started: ${cfg.target.slice(0, 60)}\nBaseline: ${baseline ?? "(forced without a number — first turn must produce one)"} · direction ${cfg.direction} · window ${cfg.plateauWindow} · max ${cfg.maxIterations}` +
     (branchName ? `\nbranch mode: committing improvements to ${branchName}` : ""),
     "info",
   );
