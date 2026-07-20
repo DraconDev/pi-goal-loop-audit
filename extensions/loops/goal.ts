@@ -39,6 +39,7 @@ import {
   buildTaskList,
   buildTaskSummary,
   mergeSettings,
+  routeGoalArgs,
   sumNewAssistantTokens,
   type TaskProposal,
   validateTaskProposal,
@@ -410,6 +411,24 @@ function startDrafting(ctx: ExtensionContext, target: "goal" | "list" | "loop"):
   } catch {
     draftingTarget = null;
   }
+}
+
+// =================================================================
+// /goal router (v0.8.0): subcommands route to their handlers; everything
+// else is an objective (draft if empty, set+start otherwise).
+// =================================================================
+
+async function cmdGoal(args: string, ctx: ExtensionContext): Promise<void> {
+  const route = routeGoalArgs(args);
+  if (route.kind === "sub") {
+    if (route.name === "status") return cmdStatus(ctx);
+    if (route.name === "pause") return cmdPause(ctx);
+    if (route.name === "resume") return cmdResume(ctx);
+    if (route.name === "cancel") return cmdCancel(ctx);
+    if (route.name === "tweak") return cmdTweak(route.rest, ctx);
+    if (route.name === "archive") return cmdGoals(ctx);
+  }
+  return cmdSet(route.kind === "set" ? route.text : "", ctx);
 }
 
 // =================================================================
@@ -1459,6 +1478,11 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
   //   /gla model=unset          remove key (from global; project model=unset for project)
   const trimmed = args.trim();
   if (!trimmed) {
+    if (ctx.hasUI) {
+      await openSettingsUI(ctx);
+      return;
+    }
+    // Headless fallback: text display with provenance.
     const prov = settingsProvenance(ctx.cwd);
     const fmt = (k: keyof Settings, label: string) => {
       const p = prov[k];
@@ -1540,7 +1564,7 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
 // We detect duplicates at session start and warn loudly once.
 // =================================================================
 
-const OUR_COMMANDS = ["goal", "goals", "goal-status", "goal-pause", "goal-resume", "goal-cancel", "goal-tweak", "gla", "list", "loop"];
+const OUR_COMMANDS = ["goal", "gla", "list", "loop"];
 let collisionWarned = false;
 
 // Providers verified to exist in a bare (extension-less) session. The auditor
@@ -1625,20 +1649,10 @@ export default function (pi: ExtensionAPI): void {
     handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdLoop(args, ctx); },
   });
 
-  // Tool registration is done after first command so the context is available.
-  // For v0.1.0 we register at load; we accept that tools show even without an
-  // active goal (and return "no active goal" if called).
+  // Tool registration is lazy: done on the first session event, when a
+  // context exists. Tools show even without an active goal (and return
+  // "no active goal" if called).
   let registeredCtx: ExtensionContext | null = null;
-  pi.registerCommand("goal-init", {
-    description: "Internal: register agent tools. Called once at session start.",
-    handler: async (_args: string, ctx: ExtensionContext) => {
-      rememberCtx(ctx);
-      if (!registeredCtx) {
-        registerAgentTools(pi, ctx);
-        registeredCtx = ctx;
-      }
-    },
-  });
 
   pi.on("session_start", async (_event: any, ctx: ExtensionContext) => {
     rememberCtx(ctx);
