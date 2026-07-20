@@ -36,7 +36,7 @@ What happens next:
 4. Approved → goal archived to `.pi-gla/archive/<id>.md`. Disapproved → the
    loop continues with the auditor's feedback.
 
-Useful commands: `/goal-status`, `/goal-pause`, `/goal-resume`, `/goal-cancel`,
+Useful commands: `/goal status`, `/goal pause`, `/goal resume`, `/goal cancel`,
 `/gla` (auditor model, thinking level, token limit, notify command).
 
 ## Loop 2: `/list` — queue of goals

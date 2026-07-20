@@ -53,7 +53,7 @@ Scope: make the goal loop actually work end-to-end in a live pi session. No new 
 pi -e /home/dracon/Dev/pi-goal-loop-audit
 > /goal "Create file hello.txt containing the word world. Done when: grep -q world hello.txt"
 # expect: agent writes file, calls complete_goal, auditor approves, goal archived
-> /goal-status        # expect: complete, audit history shows 1 approved
+> /goal status        # expect: complete, audit history shows 1 approved
 cat .pi-gla/active.jsonl | tail -3
 ls .pi-gla/archive/   # expect: one .md file
 ```
@@ -178,7 +178,7 @@ in OUR plugin. Liveness is the loop's own job. Bake it in; cut the watchdog.
    but scoped to real goal progress). Pure decision function unit-tested.
    Scope note: this covers stalls while a goal/loop is active. Non-goal sessions
    are the user's own business — they are at the keyboard.
-2. **`/goal-tweak "<text>"`** — edit the active goal's objective in place
+2. **`/goal tweak "<text>"`** — edit the active goal's objective in place
    (Confirm dialog shows old vs new; contract re-extracted from the new text).
    Closes the last pi-goal-x feature gap we use.
 3. **Structured drafting forms**: drafting prompt prefers `ask_user_question`
@@ -191,7 +191,7 @@ in OUR plugin. Liveness is the loop's own job. Bake it in; cut the watchdog.
 **M5 evidence** (2026-07-20):
 - Heartbeat: 8 unit tests for the stall predicate + nudge accounting; `goal`
   smoke 5/5 with the heartbeat interval live through the full cycle.
-- `/goal-tweak`: implemented with Confirm dialog + contract re-extraction.
+- `/goal tweak`: implemented with Confirm dialog + contract re-extraction.
 - Drafting prompt prefers `ask_user_question` when available.
 - 89 unit tests, tsc clean.
 

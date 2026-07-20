@@ -31,11 +31,11 @@ Use:
 ```
 /goal                              # drafting: agent grills, you Confirm
 /goal "Step 1. Step 2. Done when: tests pass."   # set + start now
-/goal-status                       # show state
-/goal-pause                        # pause
-/goal-resume                       # resume
-/goal-cancel                       # abort
-/goal-tweak "<new objective>"      # edit in place (Confirm dialog)
+/goal status                       # show state
+/goal pause                        # pause
+/goal resume                       # resume
+/goal cancel                       # abort
+/goal tweak "<new objective>"      # edit in place (Confirm dialog)
 /gla                     # auditor model + thinking + tokenlimit + notify
 /list add                         # draft a contract INTO the queue
 /list add "<objective>"            # queue directly
@@ -48,7 +48,7 @@ Use:
 /loop start "reduce TODOs" measure="..." direction=min branch=1   # scratch-branch mode
 /loop status                       # iteration, best, stall, recent values
 /loop stop                         # halt with summary
-/goals                             # archived goals, newest first
+/goal archive                     # archived goals, newest first
 ```
 
 **Drafting is the default for long-running things.** `/goal`, `/list add`, and
