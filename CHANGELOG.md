@@ -5,6 +5,36 @@ All notable changes to pi-goal-loop-audit are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] — 2026-07-20
+
+Self-sufficiency release: the loop now owns its own liveness. A goal loop that
+dies silently after compaction and needs an external plugin to restart it is a
+hole in THIS plugin — so the watchdog is baked in, and the external one
+(`@badliveware/pi-compaction-continue`) can be cut.
+
+### Added
+
+- **Heartbeat self-watchdog**: a 15s interval checks the one precise stall
+  condition — supervising (active goal or running loop) + session idle + no
+  continuation/loop timer scheduled + no activity for 60s — and re-fires the
+  continuation itself. Covers every stall cause (compaction-eaten turn,
+  dropped message, stale ctx) with a single check. Stall accounting: a
+  supervising turn with zero tool calls is a nudge; 3 consecutive nudges
+  pause the goal / stop the loop with a clear reason. Pure decision functions
+  in `goal-loop-backoff.ts`, 8 unit tests.
+- **`/goal-tweak "<new objective>"`** — edit the active goal in place; Confirm
+  dialog shows current vs new; the verification contract is re-extracted from
+  the new text (old contract dropped if the new text carries none).
+- **Structured drafting forms**: the drafting prompt now prefers
+  `ask_user_question` (from `rpiv-ask-user-question`) when the tool is
+  available in the session — structured option lists during grilling without
+  a hard dependency. Plain conversation remains the fallback.
+
+### Verified (2026-07-20)
+
+- 89 unit tests green; `tsc --noEmit` clean.
+- `goal` smoke 5/5 with the heartbeat interval live through the full cycle.
+
 ## [0.4.0] — 2026-07-20
 
 The completion release: the last open pi-goal-x flaw is closed, and every

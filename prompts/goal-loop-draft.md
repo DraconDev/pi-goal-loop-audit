@@ -7,9 +7,11 @@ request into a **confirmed goal contract**. Do NOT start substantive work yet.
 
 ## Protocol
 
-1. If the request is vague, ask ONE focused question at a time. Plain
-   conversation is fine — no special tooling needed. Offer a recommended
-   default with each question so the user can answer with "yes".
+1. If the request is vague, ask ONE focused question at a time. Offer a
+   recommended default with each question so the user can answer with "yes".
+   If an `ask_user_question` tool is available in this session, prefer it for
+   structured choices (it renders proper option lists); plain conversation is
+   fine otherwise and for free-form answers.
 2. Targeted read-only research is allowed when it helps define a better
    contract (read a file, check the repo layout). Do NOT implement anything.
 3. The contract needs, at minimum:

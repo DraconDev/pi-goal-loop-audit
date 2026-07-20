@@ -470,6 +470,43 @@ async function cmdCancel(ctx: ExtensionContext): Promise<void> {
   ctx.ui.notify("Goal aborted.", "info");
 }
 
+async function cmdTweak(args: string, ctx: ExtensionContext): Promise<void> {
+  if (!state.goal || state.goal.status !== "active") {
+    ctx.ui.notify("No active goal to tweak. /goal <objective> to start one.", "info");
+    return;
+  }
+  let raw = args.trim();
+  if (raw.length >= 2 && ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")))) {
+    raw = raw.slice(1, -1).trim();
+  }
+  if (!raw) {
+    ctx.ui.notify("Usage: /goal-tweak <replacement objective, optional 'Done when: ...' clause>", "info");
+    return;
+  }
+  const current = state.goal;
+  const proposed = extractVerificationContract(raw);
+  const newObjective = proposed.objective;
+  const newContract = proposed.verificationContract;
+  let confirmed = false;
+  try {
+    confirmed = await ctx.ui.confirm(
+      "Tweak goal?",
+      `CURRENT:\n${current.objective.slice(0, 400)}\n\nNEW:\n${newObjective.slice(0, 400)}` +
+      (newContract ? `\n\nNew contract:\n${newContract.slice(0, 200)}` : "\n\n(New text carries no contract; old contract is dropped.)"),
+    );
+  } catch {
+    confirmed = false;
+  }
+  if (!confirmed) {
+    ctx.ui.notify("Tweak cancelled; goal unchanged.", "info");
+    return;
+  }
+  updateGoal({ objective: newObjective, verificationContract: newContract }, ctx);
+  appendLedger(ctx.cwd, "goal_tweaked", { goalId: current.id, objective: newObjective });
+  ctx.ui.notify("Goal tweaked. The loop continues against the new objective.", "info");
+  scheduleContinuation(ctx, true);
+}
+
 // =================================================================
 // /list commands (loop 2)
 // =================================================================
@@ -1251,7 +1288,7 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
 // We detect duplicates at session start and warn loudly once.
 // =================================================================
 
-const OUR_COMMANDS = ["goal", "goal-status", "goal-pause", "goal-resume", "goal-cancel", "goal-settings", "list", "loop"];
+const OUR_COMMANDS = ["goal", "goal-status", "goal-pause", "goal-resume", "goal-cancel", "goal-tweak", "goal-settings", "list", "loop"];
 let collisionWarned = false;
 
 // Providers verified to exist in a bare (extension-less) session. The auditor
@@ -1333,6 +1370,10 @@ export default function (pi: ExtensionAPI): void {
   pi.registerCommand("goal-cancel", {
     description: "Abort the current goal.",
     handler: (_args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdCancel(ctx); },
+  });
+  pi.registerCommand("goal-tweak", {
+    description: "Edit the active goal's objective in place (Confirm dialog). /goal-tweak <new objective>",
+    handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdTweak(args, ctx); },
   });
   pi.registerCommand("goal-settings", {
     description: "Configure auditor model + thinking level (interactive prompt).",
