@@ -422,14 +422,14 @@ async function cmdSet(args: string, ctx: ExtensionContext): Promise<void> {
     raw = raw.slice(1, -1).trim();
   }
   if (!raw) {
-    startDrafting(ctx);
+    startDrafting(ctx, "goal");
     return;
   }
   if (isLoopActive()) {
     ctx.ui.notify("A /loop is active — /loop stop it before setting a goal.", "warning");
     return;
   }
-  draftingActive = false; // explicit objective cancels any drafting session
+  draftingTarget = null; // explicit objective cancels any drafting session
   const goal = createGoal(raw, ctx);
   setGoal(goal, ctx);
   // Reset counters
@@ -1091,9 +1091,9 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
     }),
     async execute(_id, params, _signal, _onUpdate, execCtx) {
       const p = params as { objective: string; verificationContract?: string };
-      if (!draftingActive) {
+      if (draftingTarget !== "goal" && draftingTarget !== "list") {
         return {
-          content: [{ type: "text", text: "Not in drafting mode. The user starts drafting with /goal (no args), or activates directly with /goal <objective>." }],
+          content: [{ type: "text", text: "Not in goal drafting mode. The user starts drafting with /goal or /list add (no args), or activates directly with /goal <objective>." }],
           details: {},
         };
       }
@@ -1113,8 +1113,22 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
           details: {},
         };
       }
-      draftingActive = false;
+      const confirmedTarget = draftingTarget;
+      draftingTarget = null;
       const full = p.objective.trim() + (p.verificationContract?.trim() ? `\nDone when:\n${p.verificationContract.trim()}` : "");
+      // List drafting: the confirmed contract goes into the QUEUE, not active.
+      if (confirmedTarget === "list") {
+        const extracted = extractVerificationContract(full);
+        const item = { id: newGoalId(), objective: extracted.objective, verificationContract: extracted.verificationContract || undefined, addedAt: nowIso() };
+        state = { ...state, list: [...listQueue(), item] };
+        persistState(liveCtx);
+        appendLedger(liveCtx.cwd, "list_added", { id: item.id, objective: item.objective, drafted: true });
+        if (!state.goal || state.goal.status === "complete" || state.goal.status === "aborted") {
+          activateNextListItem(liveCtx);
+          return { content: [{ type: "text", text: "Confirmed and activated (queue was empty). Begin work now." }], details: {} };
+        }
+        return { content: [{ type: "text", text: `Confirmed and queued (${listQueue().length} waiting). It activates when the current goal completes.` }], details: {} };
+      }
       const goal = createGoal(full, liveCtx);
       setGoal(goal, liveCtx);
       iterationCounter = 0;
