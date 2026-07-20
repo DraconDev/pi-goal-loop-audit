@@ -27,7 +27,8 @@ Install:
 pi install npm:pi-goal-loop-audit
 ```
 
-Use:
+Four top-level commands, that's all:
+
 ```
 /goal                              # drafting: agent grills, you Confirm
 /goal "Step 1. Step 2. Done when: tests pass."   # set + start now
@@ -36,20 +37,24 @@ Use:
 /goal resume                       # resume
 /goal cancel                       # abort
 /goal tweak "<new objective>"      # edit in place (Confirm dialog)
-/gla                     # auditor model + thinking + tokenlimit + notify
-/list add                         # draft a contract INTO the queue
+/goal archive                      # archived goals, newest first
+/gla                               # open the settings UI (or /gla key=value)
+/list add                          # draft a contract INTO the queue
 /list add "<objective>"            # queue directly
 /list                              # show active + queue
 /list next                         # skip current, activate next
 /list remove <n>                   # drop item n from the queue
 /list clear                        # empty the queue
-/loop                             # draft the loop (agent grills; measure is test-run before you confirm)
+/loop                              # draft the loop (agent grills; measure is test-run before you confirm)
 /loop start "reduce TODOs" measure="grep -c TODO src.txt | head -1" direction=min
 /loop start "reduce TODOs" measure="..." direction=min branch=1   # scratch-branch mode
 /loop status                       # iteration, best, stall, recent values
 /loop stop                         # halt with summary
-/goal archive                     # archived goals, newest first
 ```
+
+Subcommands match **exactly** — `/goal pause the pipeline` sets an objective
+about a pipeline; only bare `/goal pause` pauses. (Same rule everywhere, so
+your objectives can start with any verb.)
 
 **Drafting is the default for long-running things.** `/goal`, `/list add`, and
 `/loop` with no arguments all start a grilling turn that ends in a Confirm

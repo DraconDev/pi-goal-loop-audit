@@ -1,6 +1,6 @@
 {
   "name": "pi-goal-loop-audit",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Goal. Loop. Audit. Done. — a pi-coding-agent extension that supervises long-running work, with isolated auditor on each completion. Beat bamboozling by design: the auditor runs in a fresh session with no extensions, no skills, no editor — only the read tools needed to verify your goal.",
   "license": "MIT",
   "author": "dracon",

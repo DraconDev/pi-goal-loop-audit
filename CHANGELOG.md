@@ -5,6 +5,29 @@ All notable changes to pi-goal-loop-audit are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-07-21
+
+### Changed — `/gla` opens a real settings UI; four top-level commands
+
+- **`/gla` now opens an interactive settings menu** (pi dialog primitives):
+  pick a setting → edit it (input for model/notify/token limit, select for
+  thinking level) → saved to GLOBAL → back to the menu until Done/Esc. The
+  scriptable `/gla key=value` and `/gla project key=value` forms remain for
+  tmux/headless; headless sessions get the text display with provenance.
+- **Top-level commands consolidated from 11 to 4**: `/goal`, `/list`,
+  `/loop`, `/gla`. The goal verbs became exact-match subcommands:
+  `/goal status|pause|resume|cancel|tweak <text>|archive`. Removed:
+  `goal-status`, `goal-pause`, `goal-resume`, `goal-cancel`, `goal-tweak`,
+  `goals`, `goal-init`.
+- **The ambiguity rule** (unit-tested): subcommands match only on the exact
+  bare word, so `/goal pause the deployment pipeline` sets an objective about
+  a pipeline — only bare `/goal pause` pauses. `routeGoalArgs` in core,
+  10 tests including the critical cases.
+
+### Verified (2026-07-21)
+
+- 104 unit tests, tsc clean.
+
 ## [0.7.1] — 2026-07-21
 
 ### Changed — `/goal-settings` renamed to `/gla`
