@@ -21,11 +21,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dracon/pi-goal-loop-audit.git"
+    "url": "git+https://github.com/DraconDev/pi-goal-loop-audit.git"
   },
-  "homepage": "https://github.com/dracon/pi-goal-loop-audit#readme",
+  "homepage": "https://github.com/DraconDev/pi-goal-loop-audit#readme",
   "bugs": {
-    "url": "https://github.com/dracon/pi-goal-loop-audit/issues"
+    "url": "https://github.com/DraconDev/pi-goal-loop-audit/issues"
   },
   "files": [
     "extensions",

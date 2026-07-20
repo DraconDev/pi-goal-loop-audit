@@ -66,7 +66,7 @@ See `docs/DESIGN.md`.
 ## Installation from source
 
 ```bash
-git clone https://github.com/dracon/pi-goal-loop-audit.git
+git clone https://github.com/DraconDev/pi-goal-loop-audit.git
 cd pi-goal-loop-audit
 pi install .
 ```

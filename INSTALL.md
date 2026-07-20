@@ -9,7 +9,7 @@
 ## Install from source
 
 ```bash
-git clone https://github.com/dracon/pi-goal-loop-audit.git   # or use the local dir
+git clone https://github.com/DraconDev/pi-goal-loop-audit.git   # or use the local dir
 cd pi-goal-loop-audit
 pi install .                                               # installs from local path
 ```
