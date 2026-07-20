@@ -26,6 +26,7 @@ import {
   piGlaDir,
   readGoalMd,
   readState,
+  mergeSettings,
   renderGoalMarkdown,
   statusLabel,
   sumNewAssistantTokens,
@@ -238,6 +239,34 @@ test("sumNewAssistantTokens ignores zero/negative/invalid usage", () => {
     { role: "assistant", timestamp: 3, usage: { totalTokens: "many" } },
   ];
   assert.equal(sumNewAssistantTokens(msgs, seen), 0);
+});
+
+test("mergeSettings: later layers win per key", () => {
+  const out = mergeSettings(
+    { a: 1, b: 2, c: 3 } as Record<string, unknown>,
+    { b: 20 },
+    { c: 30 },
+  );
+  assert.deepEqual(out, { a: 1, b: 20, c: 30 });
+});
+
+test("mergeSettings: undefined in a layer means 'not set here'", () => {
+  const out = mergeSettings(
+    { a: 1, b: 2 } as Record<string, unknown>,
+    { a: undefined, b: 99 },
+  );
+  assert.deepEqual(out, { a: 1, b: 99 });
+});
+
+test("mergeSettings: null/missing layers are skipped", () => {
+  const out = mergeSettings({ a: 1 } as Record<string, unknown>, null, undefined, { b: 2 });
+  assert.deepEqual(out, { a: 1, b: 2 });
+});
+
+test("mergeSettings: does not mutate the base", () => {
+  const base = { a: 1 } as Record<string, unknown>;
+  mergeSettings(base, { a: 5 });
+  assert.equal(base.a, 1);
 });
 
 test("ensureDirs creates the .pi-gla tree", () => {
