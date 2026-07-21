@@ -108,6 +108,65 @@ Each loop is a different policy class on the same status machine.
 | Auditor can't compact — context exhaustion mid-audit | Compaction enabled (v0.4.0); safe because the shield is orchestrator-side |
 | Agent can grow subtasks indefinitely | `propose_task_list` with 20/5 caps + Confirm dialog (v0.3.0) |
 
+## Live TUI (always know it's on)
+
+A persistent `gla:` status segment + an above-editor widget show the current
+goal/loop at all times: objective, status, elapsed, tokens, next task or loop
+metric, pause reason, and live auditor progress during audits. If something is
+running, you can see it — no command needed.
+
+## Self-watchdog (liveness is built in)
+
+A 15s heartbeat detects the precise stall condition — active goal/loop + idle
+session + nothing scheduled + quiet for 60s — and re-fires the continuation
+itself. Three consecutive zero-tool turns pause the goal / stop the loop.
+No external watchdog plugin needed.
+
+## Config (one global place, rarely opened)
+
+```
+/gla                                # open the settings UI
+/gla model=provider/id              # auditor model override → GLOBAL
+/gla thinking=high                  # auditor thinking → GLOBAL
+/gla notify='cmd "$1"'              # push on complete/pause/stop → GLOBAL
+/gla tokenlimit=2000000             # per-goal token budget → GLOBAL
+/gla project tokenlimit=500         # rare per-project override
+```
+
+Resolution per key: **project > global > defaults**. The auditor defaults to
+your pi session model (auto-fallback to a credentialed built-in, named once at
+info level, when the session provider is extension-registered); thinking
+follows the session too (floor `high`).
+
+## Token guard
+
+Every goal tracks real token usage; crossing the budget pauses the goal.
+Default 1,000,000 per goal — tune with `/gla tokenlimit=<n>`.
+
+## Compatibility (what goes well, what conflicts)
+
+**The Two-Driver Rule**: any plugin that drives agent turns on `agent_end`
+conflicts — two supervisors scheduling continuations into one session produce
+contradictory turns. One driver at a time:
+
+- **Hard conflicts** (do not install together): `pi-codex-goal`, `pi-loop-mode`,
+  `pi-goal-x`, `pi-goal*`, `ralphi`, `pi-ralph*`, `pi-autoresearch` (active).
+- **Overlap**: `@badliveware/pi-compaction-continue` — our heartbeat covers
+  stalls while a goal/queue/loop is active; both installed may double-nudge.
+- **Installed-but-don't-run-simultaneously**: `@tmustier/pi-ralph-wiggum` —
+  fine to keep, never run a ralph loop while a goal/queue/loop is active.
+
+**Goes well with it**: `@juicesharp/rpiv-ask-user-question` (drafting uses its
+structured forms), `@tintinweb/pi-subagents` (spawn research/review subagents
+inside goal work), `@tintinweb/pi-tasks` (session-wide DAGs vs our goal-scoped
+task lists — different granularity), `pi-chrome` (browser for research goals),
+search skills (`mmx-cli`, `pi-search-skill`).
+
+**Two footnotes**: (1) extension-registered providers work in the main session
+but not the auditor's extension-less session — the auto-fallback names a pick,
+`/gla model=` pins it. (2) `pi-notify-agent` notifies on every turn;
+`/gla notify=` fires only on goal complete/pause/loop stop.
+
 ## Files
 
 ```
