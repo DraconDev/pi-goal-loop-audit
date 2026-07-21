@@ -2032,7 +2032,7 @@ export default function (pi: ExtensionAPI): void {
   //   /loop  — the metric loop (draft|start|status|stop)
   //   /gla   — the settings UI (+ scriptable key=value)
   pi.registerCommand("goal", {
-    description: "Set/draft a goal, or /goal status|pause|resume|cancel|tweak <text>|archive. Subcommands match exactly, so objectives starting with those words still work.",
+    description: "Set/draft a goal, or /goal status|pause|resume|cancel|tweak <text>|archive. Objectives without a 'Done when:' clause are grilled into a contract first (nothing activates until you confirm); include the clause to start instantly.",
     handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdGoal(args, ctx); },
   });
   pi.registerCommand("gla", {

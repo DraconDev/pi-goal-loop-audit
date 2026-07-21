@@ -8,7 +8,7 @@
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
 
-import { routeGoalArgs } from "../extensions/goal-loop-core.ts";
+import { goalArgsNeedDrafting, routeGoalArgs } from "../extensions/goal-loop-core.ts";
 
 test("empty args → draft", () => {
   assert.deepEqual(routeGoalArgs(""), { kind: "draft" });
@@ -65,4 +65,20 @@ test("plain objectives set", () => {
 
 test("quoted objectives set (quote stripping happens downstream)", () => {
   assert.deepEqual(routeGoalArgs('"do the thing"'), { kind: "set", text: '"do the thing"' });
+});
+
+test("goalArgsNeedDrafting: vague objective needs drafting", () => {
+  assert.equal(goalArgsNeedDrafting("audit the current state"), true);
+  assert.equal(goalArgsNeedDrafting("fix the bug"), true);
+});
+
+test("goalArgsNeedDrafting: explicit contract activates instantly", () => {
+  assert.equal(goalArgsNeedDrafting("Fix X Done when: tests pass"), false);
+  assert.equal(goalArgsNeedDrafting("Ship it. Done when: npm publish succeeds"), false);
+  assert.equal(goalArgsNeedDrafting("done when: clean tsc", ), false);
+});
+
+test("goalArgsNeedDrafting: empty is the no-args drafting path", () => {
+  assert.equal(goalArgsNeedDrafting(""), false);
+  assert.equal(goalArgsNeedDrafting("   "), false);
 });
