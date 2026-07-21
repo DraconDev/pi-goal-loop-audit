@@ -43,6 +43,8 @@ Four top-level commands, that's all:
 /list add "<objective>"            # queue one directly
 /list add plan.md                  # file detected → bulk import, one Confirm
 /list add <paste a checklist>      # multi-line paste → same batch flow
+
+(Or just say it: "queue these 10 things…" — the agent manages the list too.)
 /list                              # show active + queue
 /list next                         # skip current, activate next
 /list remove <n>                   # drop item n from the queue

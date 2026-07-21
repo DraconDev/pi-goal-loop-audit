@@ -5,6 +5,27 @@ All notable changes to pi-goal-loop-audit are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.4] — 2026-07-21
+
+### Added — free-style list: the agent can manage the queue
+
+- **`list_add` tool**: the queue is no longer command-only. Plain chat works —
+  "queue these 10 things", "add this to my list", "put it on the backlog" —
+  the agent enqueues with per-item `Done when:` extraction and
+  auto-activation. This was the real gap vs sisyphus/ralph-style plugins:
+  conversational flow with our audited-queue semantics.
+- **`list_status` tool**: the agent can read the active goal, the queue, and
+  any running loop as text before deciding what to do.
+- **`enqueueItems`**: the one shared enqueue path — bulk import, `items[]`
+  drafting, and `list_add` all funnel through it (three copies eliminated).
+
+### Verified (2026-07-21)
+
+- Live: one plain-chat sentence ("queue these three things: …") →
+  `list_add {count: 3}` (agent added its own Done-when clauses) →
+  three goals worked → **three independent auditor approvals** → archived.
+- 118 unit tests, tsc clean.
+
 ## [0.8.3] — 2026-07-21
 
 ### Changed — quiet auditor auto-fallback; `/list add` takes pasted lists

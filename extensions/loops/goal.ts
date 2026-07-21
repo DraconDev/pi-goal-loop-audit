@@ -569,6 +569,26 @@ async function cmdTweak(args: string, ctx: ExtensionContext): Promise<void> {
 // /list commands (loop 2)
 // =================================================================
 
+/**
+ * The ONE enqueue path (v0.8.4): bulk import, items[] drafting, and the
+ * agent's list_add tool all funnel here. Texts → ListItems (with per-item
+ * contract extraction) → appended to the queue → persisted → first item
+ * activated when nothing is running. Returns the count enqueued.
+ */
+function enqueueItems(ctx: ExtensionContext, texts: string[], source: string): number {
+  const items = texts.map((text) => {
+    const extracted = extractVerificationContract(text);
+    return { id: newGoalId(), objective: extracted.objective, verificationContract: extracted.verificationContract || undefined, addedAt: nowIso() };
+  });
+  state = { ...state, list: [...listQueue(), ...items] };
+  persistState(ctx);
+  appendLedger(ctx.cwd, "list_imported", { source, count: items.length });
+  if (!state.goal || state.goal.status === "complete" || state.goal.status === "aborted") {
+    activateNextListItem(ctx);
+  }
+  return items.length;
+}
+
 /** Bulk-enqueue parsed items: one Confirm for the whole batch, never drafts. */
 async function bulkAddItems(ctx: ExtensionContext, parsed: string[], sourceName: string): Promise<void> {
   if (parsed.length === 0) {
@@ -591,17 +611,9 @@ async function bulkAddItems(ctx: ExtensionContext, parsed: string[], sourceName:
     ctx.ui.notify("Import cancelled.", "info");
     return;
   }
-  const items = parsed.map((text) => {
-    const extracted = extractVerificationContract(text);
-    return { id: newGoalId(), objective: extracted.objective, verificationContract: extracted.verificationContract || undefined, addedAt: nowIso() };
-  });
-  state = { ...state, list: [...listQueue(), ...items] };
-  persistState(ctx);
-  appendLedger(ctx.cwd, "list_imported", { source: sourceName, count: items.length });
-  if (!state.goal || state.goal.status === "complete" || state.goal.status === "aborted") {
-    activateNextListItem(ctx);
-  } else {
-    ctx.ui.notify(`Imported ${items.length} items (${listQueue().length} queued).`, "info");
+  const n = enqueueItems(ctx, parsed, sourceName);
+  if (state.goal && state.goal.status === "active") {
+    ctx.ui.notify(`Imported ${n} items (${listQueue().length} queued).`, "info");
   }
 }
 
@@ -1292,18 +1304,12 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
           };
         }
         draftingTarget = null;
-        const items = p.items.map((text) => {
-          const extracted = extractVerificationContract(text);
-          return { id: newGoalId(), objective: extracted.objective, verificationContract: extracted.verificationContract || undefined, addedAt: nowIso() };
-        });
-        state = { ...state, list: [...listQueue(), ...items] };
-        persistState(liveCtx);
-        appendLedger(liveCtx.cwd, "list_imported", { count: items.length, drafted: true });
-        if (!state.goal || state.goal.status === "complete" || state.goal.status === "aborted") {
-          activateNextListItem(liveCtx);
-          return { content: [{ type: "text", text: `${items.length} items confirmed; first activated (queue was empty). Begin work now.` }], details: {} };
+        const wasIdle = !state.goal || state.goal.status === "complete" || state.goal.status === "aborted";
+        const n = enqueueItems(liveCtx, p.items, "drafted batch");
+        if (wasIdle) {
+          return { content: [{ type: "text", text: `${n} items confirmed; first activated (queue was empty). Begin work now.` }], details: {} };
         }
-        return { content: [{ type: "text", text: `${items.length} items confirmed and queued (${listQueue().length} waiting).` }], details: {} };
+        return { content: [{ type: "text", text: `${n} items confirmed and queued (${listQueue().length} waiting).` }], details: {} };
       }
       const contractBlock = p.verificationContract?.trim()
         ? `\n\nDone when:\n${p.verificationContract.trim()}`
@@ -1428,6 +1434,64 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
         content: [{ type: "text", text: `Loop confirmed and started. Baseline ${parsed}. Make ONE small change per turn to move the metric ${p.direction === "min" ? "down" : "up"}.` }],
         details: {},
       };
+    },
+  }));
+
+  pi.registerTool(defineTool({
+    name: "list_add",
+    label: "Add to queue",
+    description: "Add one or many objectives to the /list queue (loop 2). Use when the user asks to queue work — 'add these to my list', 'queue these 10 things', 'put this on the backlog'. Each item becomes an audited goal; per-item 'Done when:' clauses are honored. The first queued item activates automatically when nothing is running.",
+    parameters: Type.Object({
+      items: Type.Array(Type.String(), { description: "Objectives to enqueue (1-100). Each may include its own 'Done when:' clause." }),
+    }),
+    async execute(_id, params, _signal, _onUpdate, execCtx) {
+      const p = params as { items: string[] };
+      if (!Array.isArray(p.items) || p.items.length === 0) {
+        return { content: [{ type: "text", text: "No items given." }], details: {} };
+      }
+      if (p.items.length > 100) {
+        return { content: [{ type: "text", text: `Too many items at once (${p.items.length}); max 100 per call — batch larger plans across calls.` }], details: {} };
+      }
+      const clean = p.items.map((t) => t.trim()).filter((t) => t.length > 0);
+      const liveCtx = (execCtx as ExtensionContext | undefined) ?? ctx;
+      const wasIdle = !state.goal || state.goal.status === "complete" || state.goal.status === "aborted";
+      const n = enqueueItems(liveCtx, clean, "agent list_add");
+      return {
+        content: [{
+          type: "text",
+          text: wasIdle
+            ? `${n} item(s) queued; the first is now active. Work it normally and call complete_goal when done — the next item activates automatically.`
+            : `${n} item(s) queued (${listQueue().length} waiting behind the active goal).`,
+        }],
+        details: {},
+      };
+    },
+  }));
+
+  pi.registerTool(defineTool({
+    name: "list_status",
+    label: "Queue status",
+    description: "Show the active goal and the /list queue (loop 2) as text: what's running, what's waiting.",
+    parameters: Type.Object({}),
+    async execute() {
+      const lines: string[] = [];
+      if (state.goal) {
+        lines.push(`Active [${state.goal.policy}] (${statusLabel(state.goal.status)}): ${state.goal.objective}`);
+      } else {
+        lines.push("Active: (none)");
+      }
+      const queue = listQueue();
+      if (queue.length === 0) {
+        lines.push("Queue: empty.");
+      } else {
+        lines.push(`Queue (${queue.length}):`);
+        queue.slice(0, 20).forEach((item, i) => lines.push(`${i + 1}. ${item.objective}`));
+        if (queue.length > 20) lines.push(`… and ${queue.length - 20} more`);
+      }
+      if (state.loop) {
+        lines.push(`Loop: ${state.loop.active ? "active" : "stopped"} — ${state.loop.target} (best ${state.loop.bestValue ?? "n/a"}, iteration ${state.loop.iteration})`);
+      }
+      return { content: [{ type: "text", text: lines.join("\n") }], details: {} };
     },
   }));
 
