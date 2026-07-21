@@ -879,7 +879,7 @@ async function runGit(ctx: ExtensionContext, args: string[]): Promise<{ ok: bool
   }
 }
 
-function loopPrompt(loop: LoopState, regressionNote: string, strategyNote: string, doneNote: string): string {
+function loopPrompt(loop: LoopState, regressionNote: string, strategyNote: string, boundsNote: string): string {
   const tmplPath = path.resolve(__dirname, "..", "..", "prompts", "goal-loop-forever.md");
   let tmpl: string;
   try {
@@ -899,7 +899,7 @@ function loopPrompt(loop: LoopState, regressionNote: string, strategyNote: strin
     .replace(/\$\{PLATEAU_WINDOW\}/g, String(loop.plateauWindow))
     .replace(/\$\{REGRESSION_NOTE\}/g, regressionNote)
     .replace(/\$\{STRATEGY_NOTE\}/g, strategyNote)
-    .replace(/\$\{DONE_NOTE\}/g, doneNote);
+    .replace(/\$\{BOUNDS_NOTE\}/g, boundsNote);
 }
 
 function scheduleLoopTick(ctx: ExtensionContext): void {
@@ -935,13 +935,15 @@ function sendLoopTurn(): void {
   const strategyNote = loop.stallCount >= loop.plateauWindow - 1 && loop.stallCount > 0
     ? "**You are one stall from a plateau stop. Small tweaks are not working — try a FUNDAMENTALLY different approach: different file, different technique, or revert and rethink the angle of attack.**"
     : "";
-  const doneNote = loop.doneAt !== undefined
-    ? `\n- Done threshold: stop when the metric crosses ${loop.doneAt}`
-    : "";
+  // v0.15.0: arbitrary bounds (never "completion") — surface what's armed.
+  const bounds: string[] = [];
+  if (loop.timeLimitHours !== undefined) bounds.push(`${loop.timeLimitHours}h`);
+  if (loop.tokenBudget !== undefined) bounds.push(`${loop.tokenBudget.toLocaleString()} tokens (used ${(loop.tokensUsed ?? 0).toLocaleString()})`);
+  const boundsNote = bounds.length ? `\n- Arbitrary bounds: the loop also stops after ${bounds.join(" or ")}` : "";
   try {
     extensionApi.sendMessage({
       customType: GOAL_EVENT_ENTRY,
-      content: loopPrompt(loop, regressionNote, strategyNote, doneNote),
+      content: loopPrompt(loop, regressionNote, strategyNote, boundsNote),
       display: false,
     }, { triggerTurn: true, deliverAs: "followUp" });
   } catch {
@@ -1017,7 +1019,8 @@ interface LoopConfig {
   maxIterations: number;
   branch: boolean;
   force?: boolean;
-  doneAt?: number;
+  timeLimitHours?: number;
+  tokenBudget?: number;
 }
 
 /** Shared loop-start path: /loop start AND propose_loop_draft (after Confirm). */
@@ -1073,13 +1076,15 @@ async function startLoopFromConfig(ctx: ExtensionContext, cfg: LoopConfig): Prom
       active: true,
       history: [],
       startedAt: nowIso(),
-      doneAt: cfg.doneAt,
+      timeLimitHours: cfg.timeLimitHours,
+      tokenBudget: cfg.tokenBudget,
+      tokensUsed: 0,
       branchName,
       originalBranch,
     },
   };
   persistState(ctx);
-  appendLedger(ctx.cwd, "loop_started", { target: cfg.target, measureCmd: cfg.measureCmd, direction: cfg.direction, baseline, branch: branchName, doneAt: cfg.doneAt });
+  appendLedger(ctx.cwd, "loop_started", { target: cfg.target, measureCmd: cfg.measureCmd, direction: cfg.direction, baseline, branch: branchName, timeLimitHours: cfg.timeLimitHours, tokenBudget: cfg.tokenBudget });
   ctx.ui.notify(
     `Loop started: ${cfg.target.slice(0, 60)}\nBaseline: ${baseline ?? "(forced without a number — first turn must produce one)"} · direction ${cfg.direction} · window ${cfg.plateauWindow} · max ${cfg.maxIterations}` +
     (branchName ? `\nbranch mode: committing improvements to ${branchName}` : ""),
