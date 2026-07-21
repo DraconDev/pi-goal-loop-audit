@@ -5,6 +5,27 @@ All notable changes to pi-goal-loop-audit are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] — 2026-07-21
+
+### Added — live TUI: status line + above-editor widget
+
+- **You can always tell it's on now.** A persistent `gla:` segment in the
+  status line shows the supervisor state at all times:
+  `gla: goal ● 2/5 tasks · 3m · queue 4` · `gla: auditing… · read` ·
+  `gla: paused ⏸ <reason>` · `gla: loop ↓ iter 12/50 · best 41 · stall 2/5`.
+- **Above-editor live widget** (pi-goal-x pattern, simpler `string[]` form):
+  objective head, status, elapsed, token usage, next pending task or loop
+  metric, pause reason + suggestion, branch name in branch mode, and **live
+  auditor progress** (current tool, elapsed, isolated-session note) during
+  audits. Refreshes on every state transition (single chokepoint:
+  `persistState`) plus a 5s ticker for elapsed time.
+- Pure builders in `goal-loop-display.ts` — 16 unit tests.
+
+### Verified (2026-07-21)
+
+- Live: widget renders during an audit with live auditor progress; status
+  line reads `gla: auditing…`. 134 unit tests, tsc clean.
+
 ## [0.8.5] — 2026-07-21
 
 ### Changed — auditor thinking follows the pi session
