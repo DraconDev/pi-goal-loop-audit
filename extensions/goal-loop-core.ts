@@ -236,6 +236,18 @@ export interface ListItem {
 }
 
 /**
+ * Should /goal args go through contract drafting instead of direct activation?
+ * Rule (v0.11.0): any objective WITHOUT an explicit "Done when:" clause is
+ * vague enough to grill first — the pi-goal-x lesson (arg + Enter is worse
+ * than a 5-minute draft). An explicit contract clause activates instantly.
+ */
+export function goalArgsNeedDrafting(args: string): boolean {
+  const t = args.trim();
+  if (!t) return false; // no-args is already the drafting path
+  return !/\bdone\s+when\s*:/i.test(t);
+}
+
+/**
  * Take item at 1-based index n out of the list (v0.10.0 pick-any-item
  * activation). n=1 is the head (FIFO default). Returns [taken, rest] or
  * null when n is out of range.
