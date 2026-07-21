@@ -591,55 +591,15 @@ async function cmdList(args: string, ctx: ExtensionContext): Promise<void> {
     return;
   }
 
+
   if (sub === "import") {
-    // Bulk enqueue from a file — the sisyphus-style path. Hundreds of items,
-    // one Confirm, never any drafting (bulk is direct by definition).
-    const file = rest.trim().replace(/^["']|["']$/g, "");
-    if (!file) {
-      ctx.ui.notify("Usage: /list import <path> — markdown checklist, bullets, numbered, or plain lines; headings skipped", "info");
+    // Backwards-compat alias (0.8.1 shipped it; 0.8.2 folded it into add).
+    const abs = resolveImportFile(ctx.cwd, rest.replace(/^["']|["']$/g, ""));
+    if (!abs) {
+      ctx.ui.notify("Usage: /list add <path> — file detection is automatic now; 'import' is just an alias", "info");
       return;
     }
-    const abs = path.resolve(ctx.cwd, file);
-    let content: string;
-    try {
-      content = fs.readFileSync(abs, "utf-8");
-    } catch {
-      ctx.ui.notify(`Cannot read: ${abs}`, "warning");
-      return;
-    }
-    const parsed = parseListImport(content);
-    if (parsed.length === 0) {
-      ctx.ui.notify("No items found in the file (headings/blank lines don't count).", "warning");
-      return;
-    }
-    const preview = parsed.slice(0, 5).map((t, i) => `  ${i + 1}. ${t.slice(0, 70)}`).join("\n");
-    let confirmed = true;
-    if (ctx.hasUI) {
-      try {
-        confirmed = await ctx.ui.confirm(
-          "Import into queue?",
-          `${parsed.length} items from ${path.basename(abs)}:\n${preview}${parsed.length > 5 ? `\n  … and ${parsed.length - 5} more` : ""}`,
-        );
-      } catch {
-        confirmed = false;
-      }
-    }
-    if (!confirmed) {
-      ctx.ui.notify("Import cancelled.", "info");
-      return;
-    }
-    const items = parsed.map((text) => {
-      const extracted = extractVerificationContract(text);
-      return { id: newGoalId(), objective: extracted.objective, verificationContract: extracted.verificationContract || undefined, addedAt: nowIso() };
-    });
-    state = { ...state, list: [...listQueue(), ...items] };
-    persistState(ctx);
-    appendLedger(ctx.cwd, "list_imported", { file: path.basename(abs), count: items.length });
-    if (!state.goal || state.goal.status === "complete" || state.goal.status === "aborted") {
-      activateNextListItem(ctx);
-    } else {
-      ctx.ui.notify(`Imported ${items.length} items (${listQueue().length} queued).`, "info");
-    }
+    await bulkAddFromFile(ctx, abs);
     return;
   }
 
@@ -651,6 +611,13 @@ async function cmdList(args: string, ctx: ExtensionContext): Promise<void> {
     if (!raw) {
       // /list add with no args → draft a confirmed contract INTO THE QUEUE.
       startDrafting(ctx, "list");
+      return;
+    }
+    // Flexible by detection, not by verb: an existing file path bulk-imports,
+    // anything else is a single objective. No separate import command.
+    const importFile = resolveImportFile(ctx.cwd, raw);
+    if (importFile) {
+      await bulkAddFromFile(ctx, importFile);
       return;
     }
     const { objective, verificationContract } = extractVerificationContract(raw);
