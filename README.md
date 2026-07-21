@@ -129,7 +129,7 @@ No external watchdog plugin needed.
 /gla model=provider/id              # auditor model override → GLOBAL
 /gla thinking=high                  # auditor thinking → GLOBAL
 /gla notify='cmd "$1"'              # push on complete/pause/stop → GLOBAL
-/gla tokenlimit=2000000             # per-goal token budget → GLOBAL
+/gla tokenlimit=10000000            # per-goal token budget → GLOBAL
 /gla project tokenlimit=500         # rare per-project override
 ```
 
@@ -141,7 +141,10 @@ follows the session too (floor `high`).
 ## Token guard
 
 Every goal tracks real token usage; crossing the budget pauses the goal.
-Default 1,000,000 per goal — tune with `/gla tokenlimit=<n>`.
+Default 10,000,000 per goal — a runaway threshold, not a big-goal threshold
+(real research/feature goals legitimately burn 2-4M). Tune with
+`/gla tokenlimit=<n>`. Loop 3 doesn't need this cap — it has its own brakes
+(max iterations + plateau).
 
 ## Compatibility (what goes well, what conflicts)
 
