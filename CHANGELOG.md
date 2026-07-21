@@ -5,6 +5,19 @@ All notable changes to pi-goal-loop-audit are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] — 2026-07-21
+
+### Changed — `/list` renamed to `/queue`
+
+The status line said `queue 4`, the widget said `queue 7 waiting`, `list_add`'s
+description read "Add to queue" — everything already called it a queue except
+the command. Now the command matches: `/queue add|show|next|remove|clear`.
+"List" described a static structure; this thing has FIFO behavior with
+auto-advance — that's a queue. `/list` remains as an alias for one release
+(removed in 0.10.0). `/goal` stays (a goal is not a todo — it has a contract
+and an audit); `/todo(s)` rejected (checkbox semantics invite exactly the
+vagueness the auditor exists to kill).
+
 ## [0.9.0] — 2026-07-21
 
 ### Added — live TUI: status line + above-editor widget
