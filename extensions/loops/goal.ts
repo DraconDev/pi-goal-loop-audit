@@ -32,6 +32,7 @@ import {
   buildTaskSummary,
   mergeSettings,
   parseListImport,
+  resolveImportFile,
   routeGoalArgs,
   sumNewAssistantTokens,
   type TaskProposal,
@@ -563,6 +564,50 @@ async function cmdTweak(args: string, ctx: ExtensionContext): Promise<void> {
 // =================================================================
 // /list commands (loop 2)
 // =================================================================
+
+/** Bulk-enqueue from a file: one Confirm for the whole batch, never drafts. */
+async function bulkAddFromFile(ctx: ExtensionContext, abs: string): Promise<void> {
+  let content: string;
+  try {
+    content = fs.readFileSync(abs, "utf-8");
+  } catch {
+    ctx.ui.notify(`Cannot read: ${abs}`, "warning");
+    return;
+  }
+  const parsed = parseListImport(content);
+  if (parsed.length === 0) {
+    ctx.ui.notify("No items found in the file (headings/blank lines don't count).", "warning");
+    return;
+  }
+  const preview = parsed.slice(0, 5).map((t, i) => `  ${i + 1}. ${t.slice(0, 70)}`).join("\n");
+  let confirmed = true;
+  if (ctx.hasUI) {
+    try {
+      confirmed = await ctx.ui.confirm(
+        "Import into queue?",
+        `${parsed.length} items from ${path.basename(abs)}:\n${preview}${parsed.length > 5 ? `\n  … and ${parsed.length - 5} more` : ""}`,
+      );
+    } catch {
+      confirmed = false;
+    }
+  }
+  if (!confirmed) {
+    ctx.ui.notify("Import cancelled.", "info");
+    return;
+  }
+  const items = parsed.map((text) => {
+    const extracted = extractVerificationContract(text);
+    return { id: newGoalId(), objective: extracted.objective, verificationContract: extracted.verificationContract || undefined, addedAt: nowIso() };
+  });
+  state = { ...state, list: [...listQueue(), ...items] };
+  persistState(ctx);
+  appendLedger(ctx.cwd, "list_imported", { file: path.basename(abs), count: items.length });
+  if (!state.goal || state.goal.status === "complete" || state.goal.status === "aborted") {
+    activateNextListItem(ctx);
+  } else {
+    ctx.ui.notify(`Imported ${items.length} items (${listQueue().length} queued).`, "info");
+  }
+}
 
 async function cmdList(args: string, ctx: ExtensionContext): Promise<void> {
   const parts = args.trim().split(/\s+/);
@@ -1193,14 +1238,22 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
     label: "Propose goal draft",
     description: "During goal drafting (/goal with no args), propose the clarified goal contract. Opens the user's Confirm dialog — nothing activates until they confirm.",
     parameters: Type.Object({
-      objective: Type.String({ description: "The clarified, concrete objective" }),
+      objective: Type.String({ description: "The clarified, concrete objective (single item) or a summary when items[] is used" }),
       verificationContract: Type.Optional(Type.String({ description: "Checkable done-criteria (commands, file states, test outcomes)" })),
+      items: Type.Optional(Type.Array(Type.String(), { description: "LIST drafting only: many objectives at once (e.g. 'queue these 50 things'). Each becomes a queue item; per-item 'Done when:' clauses are honored." })),
     }),
     async execute(_id, params, _signal, _onUpdate, execCtx) {
-      const p = params as { objective: string; verificationContract?: string };
+      const p = params as { objective: string; verificationContract?: string; items?: string[] };
       if (draftingTarget !== "goal" && draftingTarget !== "list") {
         return {
           content: [{ type: "text", text: "Not in goal drafting mode. The user starts drafting with /goal or /list add (no args), or activates directly with /goal <objective>." }],
+          details: {},
+        };
+      }
+      // Multi-item drafts are LIST-only: a goal is single by definition.
+      if (p.items && p.items.length > 0 && draftingTarget !== "list") {
+        return {
+          content: [{ type: "text", text: "items[] is only valid in /list drafting — a goal is a single objective. Propose one objective, or ask the user to switch to /list." }],
           details: {},
         };
       }
