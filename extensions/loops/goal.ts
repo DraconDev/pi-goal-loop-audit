@@ -1065,7 +1065,7 @@ async function cmdLoop(args: string, ctx: ExtensionContext): Promise<void> {
   if (sub === "status") {
     const loop = state.loop;
     if (!loop) {
-      ctx.ui.notify("No loop. /loop to draft one, or /loop start \"<target>\" measure=\"<cmd>\" direction=min|max [window=5] [max=50]", "info");
+      ctx.ui.notify("No loop. /loop to draft one, or /loop start \"<target>\" measure=\"<cmd>\" direction=min|max [done=<value>] [window=5] [max=50]", "info");
       return;
     }
     const lines = [
@@ -1123,7 +1123,7 @@ async function cmdLoop(args: string, ctx: ExtensionContext): Promise<void> {
     return;
   }
 
-  ctx.ui.notify("Usage: /loop [status] | /loop start \"<target>\" measure=\"<cmd>\" direction=min|max [window=5] [max=50] | /loop stop", "info");
+  ctx.ui.notify("Usage: /loop [status] | /loop start \"<target>\" measure=\"<cmd>\" direction=min|max [done=<value>] [window=5] [max=50] | /loop stop", "info");
 }
 
 // =================================================================
@@ -1987,7 +1987,7 @@ export default function (pi: ExtensionAPI): void {
     handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdList(args, ctx); },
   });
   pi.registerCommand("loop", {
-    description: "Loop 3: metric-driven forever loop. /loop start \"<target>\" measure=\"<cmd>\" direction=min|max [window=5] [max=50] | /loop status | /loop stop",
+    description: "Loop 3: metric-driven forever loop. /loop start \"<target>\" measure=\"<cmd>\" direction=min|max [done=<value>] [window=5] [max=50] | /loop status | /loop stop",
     handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdLoop(args, ctx); },
   });
 

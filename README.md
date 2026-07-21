@@ -50,7 +50,7 @@ Four top-level commands, that's all:
 /queue remove <n>                   # drop item n from the queue
 /queue clear                        # empty the queue
 /loop                              # draft the loop (agent grills; measure is test-run before you confirm)
-/loop start "reduce TODOs" measure="grep -c TODO src.txt | head -1" direction=min
+/loop start "reduce TODOs" measure="grep -c TODO src.txt | head -1" direction=min done=0
 /loop start "reduce TODOs" measure="..." direction=min branch=1   # scratch-branch mode
 /loop status                       # iteration, best, stall, recent values
 /loop stop                         # halt with summary

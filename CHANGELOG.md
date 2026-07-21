@@ -5,6 +5,26 @@ All notable changes to pi-goal-loop-audit are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] — 2026-07-21
+
+### Added — done= threshold, hypothesis line, stall strategy hint
+
+- **`/loop start ... done=<value>`**: until-done semantics (pi-loop-mode's one
+  genuinely good idea we lacked). The loop stops the MOMENT the metric
+  crosses the threshold (min: `value <= done`, max: `value >= done`) instead
+  of stalling out the plateau window first. Done beats plateau when both hit.
+  Also available as `done` in `propose_loop_draft`. Verified live: 3→2→1→0
+  stopped at iteration 3 with `done — metric crossed 0`, no stall tail.
+- **`HYPOTHESIS:` line** (pi-autoresearch's good idea): loop prompts ask the
+  agent to state its intent first; the line is parsed into every
+  `loop_measured` ledger event, making loop history auditable, not just numeric.
+- **Strategy rotation at high stall** (pi-loop-mode's other good idea): at
+  `stall >= window-1`, the directive switches from "one small change" to "try
+  a fundamentally different approach" — one creative shot before the plateau
+  stop, instead of polishing to the end.
+- 8 new unit tests (doneCrossed, done-stops-immediately, done-beats-plateau,
+  done= parsing). 142 total, tsc clean.
+
 ## [0.9.1] — 2026-07-21
 
 ### Changed — `/list` renamed to `/queue`
