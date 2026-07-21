@@ -56,7 +56,8 @@ matches `/list show`.
 /list remove <n>                   # drop item n from the queue
 /list clear                        # empty the queue
 /loop                              # draft the loop (agent grills; measure is test-run before you confirm)
-/loop start "reduce TODOs" measure="grep -c TODO src.txt | head -1" direction=min done=0
+/loop start "reduce TODOs" measure="grep -c TODO src.txt | head -1" direction=min
+/loop start "shrink the bundle" measure="..." direction=min time=4 tokens=500000   # arbitrary bounds
 /loop start "reduce TODOs" measure="..." direction=min branch=1   # scratch-branch mode
 /loop status                       # iteration, best, stall, recent values
 /loop stop                         # halt with summary
@@ -89,10 +90,16 @@ and on stop you return to your original branch with merge instructions.
 Requires a clean working tree.
 
 Loop 3 is metric-driven: the **orchestrator** runs your `measure` command after
-every agent turn and stops on plateau (`window=5` non-improving iterations by
-default), iteration cap (`max=50`), or `/loop stop`. The agent never self-reports
-progress — the loop only believes a number. There is no auditor in loop 3; the
-metric is the verdict.
+every agent turn. The agent never self-reports progress — the loop only
+believes a number. There is no auditor in loop 3; the metric is the verdict.
+
+**A loop never completes.** Goal = achievement, loop = process: there is no
+`done=` (v0.15.0 removed it — "improve until X" is a `/goal`). A loop runs
+until `/loop stop`, plateau (`window=5` non-improving iterations — the well is
+dry, not "done"), `max=` iterations, or the arbitrary bounds `time=<hours>` /
+`tokens=<budget>`. And the spec is **alive**: mid-loop the agent can call
+`propose_loop_refine` to sharpen the target or swap the measure — you confirm,
+the orchestrator test-runs and re-baselines, and both eras stay in history.
 
 ## Which loop? (the decision rule)
 
@@ -104,11 +111,14 @@ your `Done when:` contract with quoted evidence.
 or just say "queue these 10 things". Order is the default, not the law:
 `/list next <n>` picks any item.
 
-**`/loop`** — one thing, judged *numerically*. ONLY when a shell command can
-print a number that honestly tracks progress: test failures, TODO count,
-bundle size, coverage %, lint warnings, build time, dep count. The metric IS
-the auditor here — there is no semantic judge, so a fake metric (word count,
-file exists) is worse than no loop. `/loop` with no args drafts one for you:
+**`/loop`** — one thing, judged *numerically*, as a **process that never
+completes**. ONLY when a shell command can print a number that honestly
+tracks progress: test failures, TODO count, bundle size, coverage %, lint
+warnings, build time, dep count. The metric IS the auditor here — there is
+no semantic judge, so a fake metric (word count, file exists) is worse than
+no loop. There is no finish line (`done=` was removed in v0.15.0 — "improve
+until X" is a `/goal`); the loop runs until you stop it, the metric plateaus,
+or a time/token bound trips. `/loop` with no args drafts one for you:
 the agent proposes a measure, the orchestrator **test-runs it and shows you
 the real number** before you confirm; if no honest metric exists it will
 redirect you to `/goal`.

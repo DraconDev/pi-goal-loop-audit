@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.15.0] — 2026-07-21
+
+### The package is now `pi-goal-list-loop-audit` — and a loop never completes
+
+Design conversation outcome: **goal = achievement, loop = process.** The old
+name read as "a loop for goals"; the three primitives are peers and the
+name now says so. npm `pi-goal-loop-audit` is deprecated with a pointer.
+`/glla` is the settings command; `/gla` stays as an alias. State dir
+`.pi-gla` unchanged.
+
+### Breaking — `done=` removed from `/loop`
+
+A loop no longer checks for completion — *that was a goal in a trench coat.*
+`done=` now throws a teaching error pointing at `/goal "… Done when: …"`.
+The loop's ends are exactly: `/loop stop`, plateau (the well is dry),
+`max=` iterations, and the two NEW arbitrary bounds `time=<hours>` and
+`tokens=<budget>` (orchestrator-counted input+output). The loop Confirm
+dialog states it plainly: "The loop never completes."
+
+### Added — `propose_loop_refine` (the living spec)
+
+The loop's unique territory: working against a spec that can itself be
+refined. Mid-loop, the agent calls `propose_loop_refine` with a sharpened
+target and/or a new measure command plus a rationale; the user confirms;
+on a measure change the orchestrator test-runs the new command (no number =
+auto-reject) and re-baselines. `loop.refinements[]` keeps both eras;
+`/loop status` shows the refinement count. The forever prompt now names
+this as the only legitimate way to change the metric — never gaming it.
+
+## [0.14.0] — 2026-07-21
+
 All notable changes to pi-goal-loop-audit are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
