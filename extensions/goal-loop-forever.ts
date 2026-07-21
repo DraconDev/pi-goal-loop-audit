@@ -33,10 +33,18 @@ export interface LoopState {
   stopReason?: string;
   history: LoopMeasure[];
   startedAt: string;
+  /** done=<value>: stop the moment the metric crosses this (min: value <= done; max: value >= done). */
+  doneAt?: number;
   /** branch=1 mode: scratch branch holding the loop's commits. */
   branchName?: string;
   /** branch=1 mode: the branch to return to on stop. */
   originalBranch?: string;
+}
+
+/** Has the metric crossed the done= threshold? (until-done semantics.) */
+export function doneCrossed(direction: LoopDirection, value: number | null, doneAt?: number): boolean {
+  if (doneAt === undefined || value === null) return false;
+  return direction === "min" ? value <= doneAt : value >= doneAt;
 }
 
 /** Scratch-branch name for branch=1 mode. Format pinned by tests. */
@@ -76,10 +84,18 @@ export type LoopTickOutcome =
 
 /**
  * Apply one measurement to the loop state (mutates + returns the outcome).
- * Stop rules, in order: plateau (stall >= window), iteration cap.
+ * Stop rules, in order: done= threshold, plateau (stall >= window), iteration cap.
  */
 export function applyMeasurement(loop: LoopState, value: number | null, at: string): LoopTickOutcome {
   loop.iteration++;
+  if (doneCrossed(loop.direction, value, loop.doneAt)) {
+    loop.lastValue = value;
+    if (value !== null && isImprovement(loop.direction, value, loop.bestValue)) loop.bestValue = value;
+    loop.history.push({ iteration: loop.iteration, value, improved: true, at });
+    loop.active = false;
+    loop.stopReason = `done — metric crossed ${loop.doneAt} (now ${value})`;
+    return { kind: "stop", reason: loop.stopReason };
+  }
   const improved = value !== null && isImprovement(loop.direction, value, loop.bestValue);
   if (value === null) {
     loop.stallCount++;
@@ -115,6 +131,7 @@ export function parseLoopStartArgs(raw: string): {
   maxIterations: number;
   branch: boolean;
   force: boolean;
+  doneAt?: number;
 } {
   // Key=value pairs first (measure= and direction= may hold quoted values),
   // the remaining text is the target.
@@ -147,6 +164,8 @@ export function parseLoopStartArgs(raw: string): {
   const max = Number.parseInt(kv.get("max") ?? "", 10);
   const branchRaw = (kv.get("branch") ?? "").toLowerCase();
   const forceRaw = (kv.get("force") ?? "").toLowerCase();
+  const doneRaw = kv.get("done") ?? "";
+  const doneAt = doneRaw ? Number.parseFloat(doneRaw) : undefined;
   return {
     target,
     measureCmd,
@@ -155,5 +174,6 @@ export function parseLoopStartArgs(raw: string): {
     maxIterations: Number.isFinite(max) && max > 0 ? max : LOOP_DEFAULTS.maxIterations,
     branch: branchRaw === "1" || branchRaw === "true" || branchRaw === "yes",
     force: forceRaw === "1" || forceRaw === "true" || forceRaw === "yes",
+    doneAt: doneAt !== undefined && Number.isFinite(doneAt) ? doneAt : undefined,
   };
 }
