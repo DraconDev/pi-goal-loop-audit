@@ -388,18 +388,19 @@ function listQueue(): NonNullable<State["list"]> {
   return state.list ?? [];
 }
 
-function activateNextListItem(ctx: ExtensionContext): boolean {
+function activateNextListItem(ctx: ExtensionContext, n = 1): boolean {
   const queue = listQueue();
-  if (queue.length === 0) return false;
-  const [next, ...rest] = queue;
+  const taken = takeAt(queue, n);
+  if (!taken) return false;
+  const [next, rest] = taken;
   state = { ...state, list: rest };
-  const goal = createGoal(next!.objective, ctx, "list");
-  if (next!.verificationContract) goal.verificationContract = next!.verificationContract;
+  const goal = createGoal(next.objective, ctx, "list");
+  if (next.verificationContract) goal.verificationContract = next.verificationContract;
   setGoal(goal, ctx);
   iterationCounter = 0;
   consecutiveStuckIterations = 0;
   consecutiveErrorIterations = 0;
-  ctx.ui.notify(`Next list item activated (${rest.length} remaining): ${goal.objective.slice(0, 80)}`, "info");
+  ctx.ui.notify(`List item #${n} activated (${rest.length} remaining): ${goal.objective.slice(0, 80)}`, "info");
   scheduleContinuation(ctx, true);
   return true;
 }

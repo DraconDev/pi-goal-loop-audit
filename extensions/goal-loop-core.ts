@@ -235,6 +235,17 @@ export interface ListItem {
   addedAt: string;
 }
 
+/**
+ * Take item at 1-based index n out of the list (v0.10.0 pick-any-item
+ * activation). n=1 is the head (FIFO default). Returns [taken, rest] or
+ * null when n is out of range.
+ */
+export function takeAt<T>(items: T[], n: number): [T, T[]] | null {
+  if (!Number.isInteger(n) || n < 1 || n > items.length) return null;
+  const taken = items[n - 1]!;
+  return [taken, items.filter((_, i) => i !== n - 1)];
+}
+
 export interface State {
   goal: Goal | null;
   /** Loop 2: queue of pending goal items. Activated one at a time. */
