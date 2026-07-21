@@ -1812,12 +1812,26 @@ function auditorModelCandidates(ctx: ExtensionContext, ref?: string): Array<{ mo
     && !deadAuditorModels.has(`${sessionModel.provider}/${sessionModel.id}`)) {
     out.push({ model: sessionModel, via: "session" });
   }
-  for (const m of ctx.modelRegistry.getAvailable()
-    .filter((m: any) => KNOWN_BUILTIN_PROVIDERS.has(m.provider))
-    .sort((a: any, b: any) => auditModelTier(a.id ?? a.name ?? "") - auditModelTier(b.id ?? b.name ?? ""))) {
+  // Round-robin across tiers (v0.9.11): a tier-sorted list can spend all 5
+  // tries inside one dead tier (5 opus models on a balance-starved rig).
+  // Interleave tiers so the chain always reaches a different tier by try 3.
+  const byTier = new Map<number, any[]>();
+  for (const m of ctx.modelRegistry.getAvailable().filter((m: any) => KNOWN_BUILTIN_PROVIDERS.has(m.provider))) {
     const mm = m as any;
     if (deadAuditorModels.has(`${mm.provider}/${mm.id}`)) continue;
-    if (!out.some((c) => c.model.id === mm.id)) out.push({ model: mm, via: `auto-fallback: ${mm.provider}/${mm.id}` });
+    const tier = auditModelTier(mm.id ?? mm.name ?? "");
+    if (!byTier.has(tier)) byTier.set(tier, []);
+    byTier.get(tier)!.push(mm);
+  }
+  const tiers = [...byTier.keys()].sort((a, b) => a - b);
+  const maxLen = Math.max(0, ...[...byTier.values()].map((v) => v.length));
+  for (let i = 0; i < maxLen; i++) {
+    for (const t of tiers) {
+      const mm = byTier.get(t)![i];
+      if (mm && !out.some((c) => c.model.id === mm.id)) {
+        out.push({ model: mm, via: `auto-fallback: ${mm.provider}/${mm.id}` });
+      }
+    }
   }
   return out;
 }
