@@ -51,6 +51,7 @@ import {
   writeGoalMd,
 } from "../goal-loop-core.js";
 import { runGoalCompletionAuditor } from "../goal-loop-auditor.js";
+import { buildStatusText, buildWidgetLines, type AuditDisplayProgress } from "../goal-loop-display.js";
 import {
   applyMeasurement,
   loopBranchName,
@@ -116,6 +117,33 @@ function noteActivity(): void {
 
 function isSupervising(): boolean {
   return isLoopActive() || (!!state.goal && state.goal.status === "active" && state.goal.autoContinue);
+}
+
+// =================================================================
+// Live TUI (v0.9.0): persistent status segment + above-editor widget.
+// "Can't tell if it's on" is a bug, not a nice-to-have.
+// =================================================================
+
+let latestAuditProgress: AuditDisplayProgress | null = null;
+let uiTicker: NodeJS.Timeout | null = null;
+
+function refreshUI(ctx: ExtensionContext): void {
+  if (!ctx.hasUI) return;
+  try {
+    ctx.ui.setStatus("pi-gla", buildStatusText(state, latestAuditProgress));
+    ctx.ui.setWidget("pi-gla", buildWidgetLines(state, latestAuditProgress));
+  } catch {
+    // stale ctx — next event refreshes
+  }
+}
+
+function startUITicker(): void {
+  if (uiTicker) return;
+  uiTicker = setInterval(() => {
+    const ctx = freshCtx();
+    if (ctx && isSupervising()) refreshUI(ctx);
+  }, 5_000);
+  uiTicker.unref?.();
 }
 
 function heartbeatTick(): void {
@@ -314,6 +342,7 @@ function extractVerificationContract(raw: string): { objective: string; verifica
 
 function persistState(ctx: ExtensionContext): void {
   appendLedger(ctx.cwd, "state", { goal: state.goal, list: state.list ?? [], loop: state.loop ?? null });
+  refreshUI(ctx); // every state transition flows through here → the TUI is always current
 }
 
 function setGoal(goal: Goal, ctx: ExtensionContext): void {
@@ -1103,6 +1132,7 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       ctx.ui.notify(`Auditor running (isolated session, model: ${via ?? "setting"})…`, "info");
       // Esc during the audit aborts this tool's signal → threaded into the
       // auditor session, which aborts cleanly and returns "Auditor aborted."
+      latestAuditProgress = { label: "starting" };
       const result = await runGoalCompletionAuditor({
         ctx,
         goal: state.goal,
@@ -1111,7 +1141,16 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
         model: auditorModel,
         thinkingLevel: settings.auditorThinkingLevel ?? getSessionThinkingLevel(),
         signal: signal ?? undefined,
+        onProgress: (progress) => {
+          latestAuditProgress = {
+            currentTool: progress.currentTool,
+            label: progress.label,
+            elapsedMs: progress.elapsedMs,
+          };
+          refreshUI(ctx);
+        },
       });
+      latestAuditProgress = null;
       // Audit history: record REAL verdicts only — a non-empty report is the
       // evidence the auditor actually inspected something. Empty-report runs
       // (abort, auth failure, no model) are surfaced via pauseReason, not
@@ -1901,6 +1940,7 @@ function warnOnCommandCollision(ctx: ExtensionContext): void {
 export default function (pi: ExtensionAPI): void {
   extensionApi = pi;
   startHeartbeat();
+  startUITicker();
   // Four top-level commands, that's all (v0.8.0 consolidation):
   //   /goal  — set/draft + status|pause|resume|cancel|tweak|archive subcommands
   //   /list  — the queue (add|show|next|remove|clear)
