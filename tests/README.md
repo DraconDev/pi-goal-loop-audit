@@ -11,7 +11,7 @@ The test script is:
 node --experimental-strip-types --test tests/*.test.ts
 ```
 
-## What is covered (v0.4.0 — 81 unit tests)
+## What is covered (v0.9.3 — 142 unit tests)
 
 - **goal-loop-core.test.ts**: id generator, status labels, BFS next-pending-task,
   task summary, markdown rendering, file persistence, ledger append/read,
@@ -35,7 +35,7 @@ node --experimental-strip-types --test tests/*.test.ts
 
 - Live pi session behavior (commands, `agent_end` wiring, dialogs, auditor
   sessions). That is covered by the **live integration harness**:
-  `scripts/smoke.sh [goal|list|draft|loop]` — drives real pi sessions in tmux
+  `scripts/smoke.sh [goal|list|draft|draft-reject|loop|bamboozle]` — drives real pi sessions in tmux
   under a hermetic `PI_CODING_AGENT_DIR` and asserts on the ledger.
 
 ## Conventions
