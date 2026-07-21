@@ -85,6 +85,24 @@ default), iteration cap (`max=50`), or `/loop stop`. The agent never self-report
 progress — the loop only believes a number. There is no auditor in loop 3; the
 metric is the verdict.
 
+## Which loop? (the decision rule)
+
+**`/goal`** — one thing, judged *semantically*. Research, features, docs,
+anything where "done" needs a reader. The isolated auditor verifies against
+your `Done when:` contract with quoted evidence.
+
+**`/queue`** — many things, judged the same way, in turn. Bulk-import a plan
+or just say "queue these 10 things".
+
+**`/loop`** — one thing, judged *numerically*. ONLY when a shell command can
+print a number that honestly tracks progress: test failures, TODO count,
+bundle size, coverage %, lint warnings, build time, dep count. The metric IS
+the auditor here — there is no semantic judge, so a fake metric (word count,
+file exists) is worse than no loop. `/loop` with no args drafts one for you:
+the agent proposes a measure, the orchestrator **test-runs it and shows you
+the real number** before you confirm; if no honest metric exists it will
+redirect you to `/goal`.
+
 ## Three loops on one state machine
 
 | Loop | Command | Status |
