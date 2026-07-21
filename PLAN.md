@@ -1,4 +1,4 @@
-# PLAN — pi-goal-loop-audit
+# PLAN — pi-goal-list-loop-audit
 
 Living plan for the project. Update this file as decisions land or milestones close.
 Last updated: v0.1.0-alpha.1 scaffold.
@@ -50,7 +50,7 @@ Scope: make the goal loop actually work end-to-end in a live pi session. No new 
 
 **Live smoke script** (target: < 5 min):
 ```
-pi -e /home/dracon/Dev/pi-goal-loop-audit
+pi -e /home/dracon/Dev/pi-goal-list-loop-audit
 > /goal "Create file hello.txt containing the word world. Done when: grep -q world hello.txt"
 # expect: agent writes file, calls complete_goal, auditor approves, goal archived
 > /goal status        # expect: complete, audit history shows 1 approved
@@ -186,7 +186,7 @@ in OUR plugin. Liveness is the loop's own job. Bake it in; cut the watchdog.
    the structured-forms gap vs pi-goal-x without a hard dependency.
 4. **Rig cuts** (after publish): `pi-codex-goal`, `pi-loop-mode`,
    `@badliveware/pi-compaction-continue`. AGENTS.md stack table rewritten:
-   goal plane = pi-goal-loop-audit.
+   goal plane = pi-goal-list-loop-audit.
 
 **M5 evidence** (2026-07-20):
 - Heartbeat: 8 unit tests for the stall predicate + nudge accounting; `goal`
@@ -267,7 +267,7 @@ After M4 the 6-flaw list is closed and the roadmap table is all-shipped.
 
 ### D4 — Persistence across pi updates ✅ RESOLVED
 
-Known rig behavior (from earlier audits): `pi update` overwrites `~/.pi/agent/npm/node_modules/`, which can wipe npm-installed plugins. **Decision: document both install paths in INSTALL.md** — `pi install npm:pi-goal-loop-audit` (convenient, re-install after `pi update`) and project-local `.pi/extensions/` (permanent, survives updates). The `-e <path>` dev flow is unaffected. v0.2.0 should add a `session_start` self-check that notifies if the plugin vanished from the loaded set while `.pi-gla/active.jsonl` shows an active goal.
+Known rig behavior (from earlier audits): `pi update` overwrites `~/.pi/agent/npm/node_modules/`, which can wipe npm-installed plugins. **Decision: document both install paths in INSTALL.md** — `pi install npm:pi-goal-list-loop-audit` (convenient, re-install after `pi update`) and project-local `.pi/extensions/` (permanent, survives updates). The `-e <path>` dev flow is unaffected. v0.2.0 should add a `session_start` self-check that notifies if the plugin vanished from the loaded set while `.pi-gla/active.jsonl` shows an active goal.
 
 ---
 
@@ -307,6 +307,6 @@ grep -rn "oracle\|sisyphus\|squad\|forge" \
 - [ ] D1–D4 resolved and recorded in this file
 - [ ] `npm test` + `npm run check` + live smoke all green
 - [ ] Version bump `0.1.0-alpha.1` → `0.1.0`
-- [ ] git init + initial commit + GitHub repo `dracon/pi-goal-loop-audit`
+- [ ] git init + initial commit + GitHub repo `dracon/pi-goal-list-loop-audit`
 - [ ] `npm publish --access public`
-- [ ] Verify: `pi install npm:pi-goal-loop-audit` on a clean rig
+- [ ] Verify: `pi install npm:pi-goal-list-loop-audit` on a clean rig

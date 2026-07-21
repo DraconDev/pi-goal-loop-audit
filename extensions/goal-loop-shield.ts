@@ -1,5 +1,5 @@
 /**
- * pi-goal-loop-audit — v0.2.0
+ * pi-goal-list-loop-audit — v0.2.0
  * extensions/goal-loop-shield.ts
  *
  * regression_shield — pure, dependency-free enforcement logic.

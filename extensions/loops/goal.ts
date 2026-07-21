@@ -1,5 +1,5 @@
 /**
- * pi-goal-loop-audit — v0.1.0
+ * pi-goal-list-loop-audit — v0.1.0
  * extensions/loops/goal.ts
  *
  * The goal loop. The agent continues working, and on complete_goal,
@@ -58,6 +58,7 @@ import { runGoalCompletionAuditor } from "../goal-loop-auditor.js";
 import { buildStatusText, buildWidgetLines, type AuditDisplayProgress } from "../goal-loop-display.js";
 import {
   applyMeasurement,
+  applyRefinement,
   loopBranchName,
   parseLoopStartArgs,
   parseMetric,
@@ -826,7 +827,7 @@ function notifyExternal(ctx: ExtensionContext, message: string): void {
     const settings = loadSettings(ctx.cwd);
     const cmd = settings.notifyCmd;
     if (!cmd || !extensionApi) return;
-    void extensionApi.exec("bash", ["-c", cmd, "pi-goal-loop-audit", message], { cwd: ctx.cwd }).catch(() => {});
+    void extensionApi.exec("bash", ["-c", cmd, "pi-goal-list-loop-audit", message], { cwd: ctx.cwd }).catch(() => {});
   } catch {
     // non-fatal by design
   }
@@ -1593,6 +1594,73 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
   }));
 
   pi.registerTool(defineTool({
+    name: "propose_loop_refine",
+    label: "Propose loop spec refinement",
+    description: "While a loop is ACTIVE, propose refining the loop's spec — sharpen the target and/or change the measure command — when the current spec no longer captures 'better'. The user confirms; on a measure change the orchestrator test-runs the new command and re-baselines. Never edit the measure command or its inputs directly — that is gaming the metric.",
+    parameters: Type.Object({
+      target: Type.Optional(Type.String({ description: "The sharpened target text (omit to keep the current target)" })),
+      measureCmd: Type.Optional(Type.String({ description: "The new measure command printing ONE number (omit to keep the current metric)" })),
+      rationale: Type.String({ description: "Why the current spec no longer captures 'better' — shown to the user in the Confirm dialog" }),
+    }),
+    async execute(_id, params, _signal, _onUpdate, execCtx) {
+      const p = params as { target?: string; measureCmd?: string; rationale: string };
+      const liveCtx = (execCtx as ExtensionContext | undefined) ?? ctx;
+      const loop = state.loop;
+      if (!loop?.active) {
+        return { content: [{ type: "text", text: "No active loop to refine. propose_loop_refine is only valid while a loop is running." }], details: {} };
+      }
+      const newTarget = p.target?.trim() || loop.target;
+      const newMeasure = p.measureCmd?.trim() || loop.measureCmd;
+      if (newTarget === loop.target && newMeasure === loop.measureCmd) {
+        return { content: [{ type: "text", text: "Refinement proposed no changes — provide a new target, a new measureCmd, or both." }], details: {} };
+      }
+      // Measure change → orchestrator test-runs the new command first.
+      let newBaseline: number | null = null;
+      let testOutput = "";
+      if (newMeasure !== loop.measureCmd) {
+        if (!extensionApi) return { content: [{ type: "text", text: "No extension API available." }], details: {} };
+        try {
+          const result = await extensionApi.exec("bash", ["-c", newMeasure], { cwd: liveCtx.cwd });
+          testOutput = String((result as any)?.stdout ?? "");
+        } catch (e) {
+          return { content: [{ type: "text", text: `New measure command failed to run: ${String(e).slice(0, 200)}` }], details: {} };
+        }
+        newBaseline = parseMetric(testOutput);
+        if (newBaseline === null) {
+          return {
+            content: [{ type: "text", text: `New measure produced NO number — refinement auto-rejected.\nCommand: ${newMeasure}\nOutput: ${testOutput.slice(0, 300) || "(empty)"}\nFix it and propose again.` }],
+            details: {},
+          };
+        }
+      }
+      let confirmed = false;
+      try {
+        confirmed = await liveCtx.ui.confirm(
+          "Confirm loop spec refinement",
+          `Rationale: ${p.rationale}\n\nTarget:\n  old: ${loop.target.slice(0, 120)}\n  new: ${newTarget.slice(0, 120)}\n\nMeasure:\n  old: ${loop.measureCmd}\n  new: ${newMeasure}${newMeasure !== loop.measureCmd ? `\n  test-run: ${testOutput.slice(0, 120)} → ${newBaseline}` : ""}\n\nThe loop keeps running against the refined spec (iteration ${loop.iteration} so far). Apply?`,
+        );
+      } catch {
+        confirmed = false;
+      }
+      if (!confirmed) {
+        return { content: [{ type: "text", text: "Refinement rejected by the user. The loop continues against the current spec — keep improving the metric as defined." }], details: {} };
+      }
+      applyRefinement(loop, {
+        at: nowIso(),
+        iteration: loop.iteration,
+        oldTarget: loop.target,
+        newTarget,
+        oldMeasureCmd: loop.measureCmd,
+        newMeasureCmd: newMeasure,
+      }, newBaseline);
+      persistState(liveCtx);
+      appendLedger(liveCtx.cwd, "loop_refined", { iteration: loop.iteration, newTarget, newMeasureCmd: newMeasure, newBaseline });
+      liveCtx.ui.notify(`Loop spec refined at iteration ${loop.iteration}.${newBaseline !== null ? ` New baseline: ${newBaseline}.` : ""}`, "info");
+      return { content: [{ type: "text", text: "Refinement confirmed and applied. Continue improving against the NEW spec — one small change per turn." }], details: {} };
+    },
+  }));
+
+  pi.registerTool(defineTool({
     name: "list_add",
     label: "Add to queue",
     description: "Add one or many objectives to the /list list (loop 2). Use when the user asks to queue work — 'add these to my list', 'queue these 10 things', 'put this on the backlog'. Each item becomes an audited goal; per-item 'Done when:' clauses are honored. The first queued item activates automatically when nothing is running.",
@@ -1746,7 +1814,7 @@ const DEFAULT_SETTINGS: Settings = {
 // and rarely open this again. PROJECT is the rare local override.
 // Resolution: project > global > defaults (per key).
 function globalSettingsPath(): string {
-  return path.join(os.homedir(), ".pi", "agent", "pi-goal-loop-audit.settings.json");
+  return path.join(os.homedir(), ".pi", "agent", "pi-goal-list-loop-audit.settings.json");
 }
 
 function projectSettingsPath(cwd: string): string {
@@ -1870,7 +1938,7 @@ async function openSettingsUI(ctx: ExtensionContext): Promise<void> {
     let choice: string | undefined;
     try {
       choice = await ctx.ui.select(
-        `pi-goal-loop-audit settings — global: ${globalSettingsPath()}`,
+        `pi-goal-list-loop-audit settings — global: ${globalSettingsPath()}`,
         [
           `Auditor model override — ${show("auditorModel", "(pi session model)")}`,
           `Auditor thinking — ${show("auditorThinkingLevel", "(session, floor high)")}`,
@@ -2028,7 +2096,7 @@ function warnIfAuditorProviderRisky(ctx: ExtensionContext): void {
     const provider = (ctx.model as any)?.provider as string | undefined;
     if (!provider || KNOWN_BUILTIN_PROVIDERS.has(provider)) return;
     ctx.ui.notify(
-      `pi-goal-loop-audit: session provider "${provider}" is extension-registered — the auditor (extension-less session) will fail auth with it. If audits error, set a built-in override once: /gla model=provider/id`,
+      `pi-goal-list-loop-audit: session provider "${provider}" is extension-registered — the auditor (extension-less session) will fail auth with it. If audits error, set a built-in override once: /gla model=provider/id`,
       "info",
     );
   } catch {
@@ -2052,7 +2120,7 @@ function warnOnCommandCollision(ctx: ExtensionContext): void {
     if (dupes.length > 0) {
       const first = dupes[0] ?? "goal";
       ctx.ui.notify(
-        `pi-goal-loop-audit: command collision on ${dupes.join(", ")}. Another extension registered the same name; ours may be reachable as /${first.slice(1)}:2. Consider disabling the other plugin.`,
+        `pi-goal-list-loop-audit: command collision on ${dupes.join(", ")}. Another extension registered the same name; ours may be reachable as /${first.slice(1)}:2. Consider disabling the other plugin.`,
         "warning",
       );
     }
@@ -2078,9 +2146,15 @@ export default function (pi: ExtensionAPI): void {
     description: "Set/draft a goal, or /goal status|pause|resume|cancel|tweak <text>|archive. Objectives without a 'Done when:' clause are grilled into a contract first (nothing activates until you confirm); include the clause to start instantly.",
     handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdGoal(args, ctx); },
   });
+  const settingsHandler = (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdSettings(args, ctx); };
+  pi.registerCommand("glla", {
+    description: "Open the settings UI for goals, loops, lists, and the auditor. Scriptable form: /glla key=value · /glla project key=value",
+    handler: settingsHandler,
+  });
+  // /gla kept as an alias (renamed package, v0.15.0) — muscle memory is real.
   pi.registerCommand("gla", {
-    description: "Open the settings UI for goals, loops, lists, and the auditor. Scriptable form: /gla key=value · /gla project key=value",
-    handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdSettings(args, ctx); },
+    description: "Alias for /glla (package renamed to pi-goal-list-loop-audit in v0.15.0).",
+    handler: settingsHandler,
   });
   pi.registerCommand("list", {
     description: "Loop 2: the list of audited goals — order is the default, not the law. /list add <obj or file or paste> | /list show | /list next [n] | /list remove <n> | /list clear",

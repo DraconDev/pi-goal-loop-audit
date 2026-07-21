@@ -1,4 +1,4 @@
-// pi-goal-loop-audit — v0.8.1
+// pi-goal-list-loop-audit — v0.8.1
 // tests/list-import.test.ts
 //
 // Unit tests for bulk list-import parsing (the sisyphus-style plan path).

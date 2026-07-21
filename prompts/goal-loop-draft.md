@@ -1,4 +1,4 @@
-# Goal drafting — pi-goal-loop-audit
+# Goal drafting — pi-goal-list-loop-audit
 
 `[GOAL DRAFTING]`
 

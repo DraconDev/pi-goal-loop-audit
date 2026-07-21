@@ -1,4 +1,4 @@
-# pi-goal-loop-audit
+# pi-goal-list-loop-audit
 
 > **Goal. Loop. Audit. Done.**
 
@@ -10,7 +10,7 @@ The auditor runs in a fresh session with no extensions, no skills, no prompts, n
 
 Most pi goal extensions — `pi-goal`, `pi-goal-x`, `pi-loop-mode`, `ralphi`, `tmustier-pi-ralph-wiggum` — let the same agent that did the work also be the verifier. **That's the bamboozle trap.** The agent that wrote the implementation also says "I'm done", and the loop trusts them.
 
-`pi-goal-loop-audit` separates **implementation** from **verification**. Two independent sessions, two independent read paths, two perspectives.
+`pi-goal-list-loop-audit` separates **implementation** from **verification**. Two independent sessions, two independent read paths, two perspectives.
 
 ### Architectural guarantee
 
@@ -24,7 +24,7 @@ Most pi goal extensions — `pi-goal`, `pi-goal-x`, `pi-loop-mode`, `ralphi`, `t
 
 Install:
 ```bash
-pi install npm:pi-goal-loop-audit
+pi install npm:pi-goal-list-loop-audit
 ```
 
 Four top-level commands, that's all:
@@ -125,7 +125,7 @@ Each loop is a different policy class on the same status machine.
 
 ## What this fixes vs. pi-goal-x
 
-| Flaw in pi-goal-x | Fix in pi-goal-loop-audit |
+| Flaw in pi-goal-x | Fix in pi-goal-list-loop-audit |
 |---|---|
 | `detailedSummary` is hand-concat strings | Structured JSON state + native markdown renderer |
 | Stuck-counter has no ceiling — 1-hour waits happen | Hard 5-minute backoff cap, fall through to user notification |
@@ -232,8 +232,8 @@ See `docs/DESIGN.md`. Milestones and decisions live in `PLAN.md`.
 ## Installation from source
 
 ```bash
-git clone https://github.com/DraconDev/pi-goal-loop-audit.git
-cd pi-goal-loop-audit
+git clone https://github.com/DraconDev/pi-goal-list-loop-audit.git
+cd pi-goal-list-loop-audit
 pi install .
 ```
 

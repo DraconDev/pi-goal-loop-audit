@@ -1,4 +1,4 @@
-// pi-goal-loop-audit — v0.9.0
+// pi-goal-list-loop-audit — v0.9.0
 // tests/display.test.ts
 //
 // Unit tests for the live-TUI display builders: status line + widget lines.

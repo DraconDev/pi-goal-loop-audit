@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pi-goal-loop-audit — live integration smoke
+# pi-goal-list-loop-audit — live integration smoke
 #
 # Drives a real pi session in tmux against a scratch dir and asserts on the
 # .pi-gla ledger. This is the M2 "integration harness": it exercises the full

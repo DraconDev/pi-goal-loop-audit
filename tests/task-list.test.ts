@@ -1,4 +1,4 @@
-// pi-goal-loop-audit — v0.3.0
+// pi-goal-list-loop-audit — v0.3.0
 // tests/task-list.test.ts
 //
 // Unit tests for task-list proposal validation (the anti-drift caps) and

@@ -1,4 +1,4 @@
-// pi-goal-loop-audit — v0.1.0 schema unit tests
+// pi-goal-list-loop-audit — v0.1.0 schema unit tests
 //
 // We don't run a JSON Schema validator here — instead these are
 // fail-fast assertions on shape, so we catch regressions before publish.

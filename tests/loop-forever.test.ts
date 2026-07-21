@@ -1,4 +1,4 @@
-// pi-goal-loop-audit — v0.3.0
+// pi-goal-list-loop-audit — v0.3.0
 // tests/loop-forever.test.ts
 //
 // Unit tests for loop 3 core: metric parsing, improvement comparison,
@@ -9,6 +9,7 @@ import * as assert from "node:assert/strict";
 
 import {
   applyMeasurement,
+  applyRefinement,
   isImprovement,
   loopBranchName,
   parseLoopStartArgs,
@@ -256,4 +257,31 @@ test("loopBranchName: slug is capped at 30 chars", () => {
   const name = loopBranchName("2026-07-20T18:30:00Z", "a very long target description that goes on and on and on");
   const slug = name.split("-")[0] ? name.slice(name.indexOf("/") + 16) : "";
   assert.ok(slug.length <= 30, `slug too long: ${slug}`);
+});
+
+test("applyRefinement: target-only change keeps baseline and stall state", () => {
+  const loop = freshLoop({ bestValue: 3, lastValue: 4, stallCount: 1, iteration: 7 });
+  applyRefinement(loop, {
+    at: "2026-07-21T01:00:00.000Z", iteration: 7,
+    oldTarget: "reduce warnings", newTarget: "reduce eslint warnings in src/",
+    oldMeasureCmd: "m1", newMeasureCmd: "m1",
+  }, null);
+  assert.equal(loop.target, "reduce eslint warnings in src/");
+  assert.equal(loop.bestValue, 3);
+  assert.equal(loop.stallCount, 1);
+  assert.equal(loop.refinements!.length, 1);
+});
+
+test("applyRefinement: measure change re-baselines and resets stall", () => {
+  const loop = freshLoop({ bestValue: 3, lastValue: 4, stallCount: 2, iteration: 7 });
+  applyRefinement(loop, {
+    at: "2026-07-21T01:00:00.000Z", iteration: 7,
+    oldTarget: "t", newTarget: "t",
+    oldMeasureCmd: "m1", newMeasureCmd: "m2",
+  }, 42);
+  assert.equal(loop.measureCmd, "m2");
+  assert.equal(loop.bestValue, 42);
+  assert.equal(loop.lastValue, 42);
+  assert.equal(loop.stallCount, 0);
+  assert.equal(loop.refinements!.length, 1);
 });

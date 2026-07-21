@@ -1,4 +1,4 @@
-// pi-goal-loop-audit — v0.2.0
+// pi-goal-list-loop-audit — v0.2.0
 // tests/regression-shield.test.ts
 //
 // Unit tests for the regression_shield: contract item extraction and the

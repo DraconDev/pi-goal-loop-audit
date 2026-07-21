@@ -1,5 +1,5 @@
 /**
- * pi-goal-loop-audit — v0.3.0
+ * pi-goal-list-loop-audit — v0.3.0
  * extensions/goal-loop-forever.ts
  *
  * Loop 3 core: metric parsing, improvement comparison, plateau detection.

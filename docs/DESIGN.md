@@ -1,4 +1,4 @@
-# pi-goal-loop-audit — design
+# pi-goal-list-loop-audit — design
 
 This document records the architectural choices and why. v0.1.0 decisions are
 below; later releases append addenda rather than rewrite history.
@@ -106,11 +106,11 @@ This is a deliberate trade-off. If the user wants drafting in v0.1.0, say so and
 ### Decision 5: One package per loop (not three packages)
 
 Some alternatives considered:
-- Three packages: `pi-goal-loop-audit`, `pi-goal-loop-audit-list`, `pi-goal-loop-audit-loop`.
+- Three packages: `pi-goal-list-loop-audit`, `pi-goal-list-loop-audit-list`, `pi-goal-list-loop-audit-loop`.
 - One package with three subcommands: `/goal`, `/pi-gla-list`, `/pi-gla-loop`.
 
 We choose **one package with subcommands**. Reasoning:
-- Single install (`pi install npm:pi-goal-loop-audit`).
+- Single install (`pi install npm:pi-goal-list-loop-audit`).
 - All three loops share state machine, schemas, scaffolding.
 - v0.1.0 only ships loop 1, but the package already declares loop 2 and loop 3 as `pi.commands` so users see what is coming.
 

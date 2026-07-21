@@ -1,4 +1,4 @@
-// pi-goal-loop-audit — v0.1.0
+// pi-goal-list-loop-audit — v0.1.0
 // prompts/goal-loop-continuation.md
 //
 // This file is exported as a raw string. We don't use string-concat in TS for
@@ -9,11 +9,11 @@
 // pi-goal-x/extensions/prompts/goal-prompts.ts, but we keep the JS string
 // interpolation in the consuming function (not here).
 
-# Goal Continuation — pi-goal-loop-audit
+# Goal Continuation — pi-goal-list-loop-audit
 
 `[GOAL CHECKPOINT goalId=${GOAL_ID}]`
 
-Continue working toward the active pi-goal-loop-audit goal.
+Continue working toward the active pi-goal-list-loop-audit goal.
 
 ## Objective
 

@@ -1,4 +1,4 @@
-# Forever loop — pi-goal-loop-audit
+# Forever loop — pi-goal-list-loop-audit
 
 `[LOOP ITERATION ${ITERATION}]`
 
@@ -35,6 +35,9 @@ ${STRATEGY_NOTE}
 - Do not modify the measure command or anything it reads for configuration;
   gaming the metric is bamboozling and the plateau detector will simply stop
   the loop.
+- The spec is ALIVE: if the target needs sharpening or the metric no longer
+  captures "better", call propose_loop_refine with your rationale — the user
+  confirms or rejects. Never game or silently abandon the metric; refine it.
 - Do not rewrite the world. If the metric regressed last turn, your first job
   is to undo your own last change before trying anything new.
 - Do not stop early because the target "looks done" — the loop stops itself

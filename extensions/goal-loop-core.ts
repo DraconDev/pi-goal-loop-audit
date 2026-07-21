@@ -1,5 +1,5 @@
 /**
- * pi-goal-loop-audit — v0.1.0
+ * pi-goal-list-loop-audit — v0.1.0
  * extensions/goal-loop-core.ts
  *
  * Shared types, state machine, JSONL persistence, helpers.

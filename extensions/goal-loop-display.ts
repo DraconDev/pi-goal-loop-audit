@@ -1,5 +1,5 @@
 /**
- * pi-goal-loop-audit — v0.9.0
+ * pi-goal-list-loop-audit — v0.9.0
  * extensions/goal-loop-display.ts
  *
  * Pure display builders for the live TUI (status line + above-editor widget).

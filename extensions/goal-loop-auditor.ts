@@ -1,5 +1,5 @@
 /**
- * pi-goal-loop-audit — v0.1.0
+ * pi-goal-list-loop-audit — v0.1.0
  * extensions/goal-loop-auditor.ts
  *
  * Isolated completion auditor. Runs in a fresh pi agent session with no
@@ -94,7 +94,7 @@ function makeAuditorResourceLoader(): ResourceLoader {
 function buildGoalAuditorPrompt(goal: Goal, completionSummary: string | null | undefined, verificationSummary: string | null | undefined): string {
   const goalMd = renderGoalMarkdown(goal);
   return [
-    "You are the independent completion auditor for pi-goal-loop-audit.",
+    "You are the independent completion auditor for pi-goal-list-loop-audit.",
     "The executor claims the goal is complete. Your job is to decide whether the user's objective is actually satisfied.",
     "Be skeptical and semantic. Do not approve from paperwork, intent, file count, word count, build success, or a plausible summary alone.",
     "Use read/grep/find/ls/bash as needed to inspect real artifacts. Do not mutate files or run destructive commands.",

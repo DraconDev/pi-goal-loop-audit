@@ -1,6 +1,6 @@
 # Examples: the three loops
 
-Worked examples for `pi-goal-loop-audit` v0.4.0. State lives at `.pi-gla/`
+Worked examples for `pi-goal-list-loop-audit` v0.4.0. State lives at `.pi-gla/`
 (ledger `active.jsonl`, goal markdown in `goals/`, finished goals in `archive/`).
 
 ## Loop 1: `/goal` — single goal with isolated auditor

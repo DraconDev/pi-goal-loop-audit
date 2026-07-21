@@ -1,4 +1,4 @@
-// pi-goal-loop-audit — v0.8.0
+// pi-goal-list-loop-audit — v0.8.0
 // tests/goal-route.test.ts
 //
 // Unit tests for /goal arg routing (top-level consolidation). The exact-match

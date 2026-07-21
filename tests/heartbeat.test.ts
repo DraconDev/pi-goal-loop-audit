@@ -1,4 +1,4 @@
-// pi-goal-loop-audit — v0.5.0
+// pi-goal-list-loop-audit — v0.5.0
 // tests/heartbeat.test.ts
 //
 // Unit tests for the heartbeat self-watchdog: stall detection and

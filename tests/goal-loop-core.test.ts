@@ -1,5 +1,5 @@
 /**
- * pi-goal-loop-audit — v0.1.0
+ * pi-goal-list-loop-audit — v0.1.0
  * tests/goal-loop-core.test.ts
  *
  * Smoke tests for the core state machine, schema, and renderer.

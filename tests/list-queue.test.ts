@@ -1,4 +1,4 @@
-// pi-goal-loop-audit — v0.2.0
+// pi-goal-list-loop-audit — v0.2.0
 // tests/list-queue.test.ts
 //
 // Unit tests for loop 2 (/list): queue persistence + state restore.

@@ -1,4 +1,4 @@
-// pi-goal-loop-audit — v0.1.0
+// pi-goal-list-loop-audit — v0.1.0
 // tests/extract-verification.test.ts
 //
 // Smoke tests for the inline extractVerificationContract we use in loops/goal.ts.

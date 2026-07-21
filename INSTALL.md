@@ -9,15 +9,15 @@
 ## Install from source
 
 ```bash
-git clone https://github.com/DraconDev/pi-goal-loop-audit.git   # or use the local dir
-cd pi-goal-loop-audit
+git clone https://github.com/DraconDev/pi-goal-list-loop-audit.git   # or use the local dir
+cd pi-goal-list-loop-audit
 pi install .                                               # installs from local path
 ```
 
 ## Install from npm (after publish)
 
 ```bash
-pi install npm:pi-goal-loop-audit
+pi install npm:pi-goal-list-loop-audit
 ```
 
 > **Persistence note**: `pi update` can overwrite `~/.pi/agent/npm/node_modules/`.
@@ -52,7 +52,7 @@ PI_CODING_AGENT_DIR=/tmp/bare-agent pi -p "say ok" --model "provider/model-id"
 ## Try it without installing
 
 ```bash
-pi -e /home/dracon/Dev/pi-goal-loop-audit
+pi -e /home/dracon/Dev/pi-goal-list-loop-audit
 ```
 
 ## What you should see
