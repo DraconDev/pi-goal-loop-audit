@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.16.0] — 2026-07-22
+
+### Added — `/goal start <objective>`: the explicit skip-draft
+
+The only skip paths were embedding `Done when:` (a string heuristic) or
+surviving the interview. `/goal start` activates immediately by explicit
+command — no grilling, no Confirm gate, symmetric with `/loop start`; the
+auditor infers the contract from the objective. The drafting notice and
+`/goal` help now name the escape hatch, so a user stuck in an interview
+learns the way out from the UI itself. `/goal start` with no objective
+prints usage.
+
+## [0.15.1] — 2026-07-22
+
 ## [0.15.1] — 2026-07-22
 
 ### Fixed — endless drafting: the gate ignored dialog answers

@@ -33,6 +33,7 @@ Four top-level commands, that's all:
 /goal                              # drafting: agent grills, you Confirm
 /goal "audit the repo"             # no contract clause → agent grills you first (propose is gated on it)
 /goal "Step 1. Step 2. Done when: tests pass."   # has contract → starts now
+/goal start "fix the flaky login test"          # explicit skip-draft: starts now, no interview (auditor infers the contract)
 /goal status                       # show state
 /goal pause                        # pause
 /goal resume                       # resume
@@ -69,7 +70,9 @@ your objectives can start with any verb.)
 
 Drafting rules: **no-args drafts, args-without-a-`Done when:`-clause get
 grilled by the agent (proposing is mechanically blocked until you have
-replied at least once), args-with-a-clause start instantly, a file path is
+replied at least once — typed chat or an answered `ask_user_question` dialog
+both count), args-with-a-clause start instantly, `/goal start` skips the
+interview by explicit command, a file path is
 bulk direct.** A
 sisyphus-style plan file (checklists, bullets, numbered, plain lines) imports
 as-is — headings become nothing, items become goals. And the drafter itself
