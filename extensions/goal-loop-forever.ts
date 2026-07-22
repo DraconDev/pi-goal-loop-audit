@@ -60,7 +60,7 @@ export interface LoopState {
 export function loopBranchName(startedAtIso: string, target: string): string {
   const stamp = startedAtIso.replace(/[^0-9]/g, "").slice(0, 14);
   const slug = target.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30) || "loop";
-  return `pi-gla-loop/${stamp}-${slug}`;
+  return `pi-glla-loop/${stamp}-${slug}`;
 }
 
 export const LOOP_DEFAULTS = {

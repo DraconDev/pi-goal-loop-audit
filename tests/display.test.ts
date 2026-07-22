@@ -169,11 +169,11 @@ test("widget: loop lines include measure + metric state", () => {
     active: true,
     history: [],
     startedAt: "2026-07-21T11:00:00Z",
-    branchName: "pi-gla-loop/20260721-reduce-todos",
+    branchName: "pi-glla-loop/20260721-reduce-todos",
   };
   const lines = buildWidgetLines({ goal: null, list: [], loop }, null, NOW)!;
   assert.ok(lines.some((l) => l.includes("reduce TODOs")));
   assert.ok(lines.some((l) => l.includes("iter 3/12")));
   assert.ok(lines.some((l) => l.includes("best 2")));
-  assert.ok(lines.some((l) => l.includes("pi-gla-loop/20260721-reduce-todos")));
+  assert.ok(lines.some((l) => l.includes("pi-glla-loop/20260721-reduce-todos")));
 });

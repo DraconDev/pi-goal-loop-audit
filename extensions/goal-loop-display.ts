@@ -37,6 +37,18 @@ function sinceIso(iso: string): number {
   return Number.isFinite(t) ? Date.now() - t : 0;
 }
 
+// ---- semantic colors (optional; tests call without a theme → plain strings) ----
+
+export type DisplayColor = "accent" | "success" | "warning" | "error" | "muted" | "dim";
+export interface DisplayTheme {
+  fg(color: DisplayColor, text: string): string;
+}
+const paint = (theme: DisplayTheme | undefined, color: DisplayColor, text: string): string => (theme ? theme.fg(color, text) : text);
+
+/** Pause reasons that mean "something broke", not "waiting on the user". */
+const ERROR_PAUSE = /token limit|stalled|infra|auditor.*fail/i;
+const pauseIsError = (g: Goal): boolean => ERROR_PAUSE.test(g.pauseReason ?? "");
+
 // ---- status line (one-liner, always-on) ----
 
 export interface AuditDisplayProgress {
@@ -49,25 +61,28 @@ export interface AuditDisplayProgress {
  * One-line status for ctx.ui.setStatus("pi-glla", …).
  * Returns undefined when nothing is being supervised (clears the segment).
  */
-export function buildStatusText(state: State, audit?: AuditDisplayProgress | null, now = Date.now()): string | undefined {
+export function buildStatusText(state: State, audit?: AuditDisplayProgress | null, now = Date.now(), theme?: DisplayTheme): string | undefined {
   if (state.loop?.active) {
     const l = state.loop;
-    const arrow = l.direction === "min" ? "↓" : "↑";
-    return `glla: loop ${arrow} iter ${l.iteration}/${l.maxIterations} · best ${l.bestValue ?? "n/a"} · stall ${l.stallCount}/${l.plateauWindow}`;
+    const arrow = paint(theme, "accent", l.direction === "min" ? "↓" : "↑");
+    const stallText = `stall ${l.stallCount}/${l.plateauWindow}`;
+    const stall = l.stallCount >= l.plateauWindow - 1 ? paint(theme, "warning", stallText) : stallText;
+    return `glla: loop ${arrow} iter ${l.iteration}/${l.maxIterations} · best ${l.bestValue ?? "n/a"} · ${stall}`;
   }
   const g = state.goal;
   if (!g) return undefined;
   if (g.status === "auditing") {
     const tool = audit?.currentTool ? ` · ${audit.currentTool}` : "";
-    return `glla: auditing…${tool}`;
+    return `glla: ${paint(theme, "accent", "auditing…")}${tool}`;
   }
   if (g.status === "paused") {
-    return `glla: paused ⏸ ${truncate(g.pauseReason ?? "", 40)}`;
+    const label = `paused ⏸ ${truncate(g.pauseReason ?? "", 40)}`;
+    return `glla: ${paint(theme, pauseIsError(g) ? "error" : "warning", label)}`;
   }
   if (g.status === "active") {
     const queue = state.list?.length ? ` · list ${state.list.length}` : "";
     const tasks = g.taskList ? ` ${countDone(g)}/${countTotal(g)} tasks ·` : "";
-    return `glla: ${g.policy} ●${tasks} ${fmtElapsed(now - Date.parse(g.createdAt))}${queue}`;
+    return `glla: ${g.policy} ${paint(theme, "success", "●")}${tasks} ${fmtElapsed(now - Date.parse(g.createdAt))}${queue}`;
   }
   return undefined; // complete/aborted → clear
 }

@@ -1018,7 +1018,7 @@ async function runLoopTick(ctx: ExtensionContext, event?: any): Promise<void> {
   if (loop.branchName && outcome.kind === "continue") {
     if (outcome.improved) {
       await runGit(ctx, ["add", "-A"]);
-      const committed = await runGit(ctx, ["commit", "-m", `pi-gla-loop: iteration ${loop.iteration} (${loop.direction}=${loop.bestValue})`]);
+      const committed = await runGit(ctx, ["commit", "-m", `pi-glla-loop: iteration ${loop.iteration} (${loop.direction}=${loop.bestValue})`]);
       appendLedger(ctx.cwd, "loop_git", { action: "commit", iteration: loop.iteration, ok: committed.ok });
     } else {
       const reset = await runGit(ctx, ["reset", "--hard", "HEAD"]);
