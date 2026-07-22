@@ -30,9 +30,13 @@ export interface LoopRefinement {
 
 export interface LoopState {
   target: string;
-  measureCmd: string;
-  direction: LoopDirection;
+  /** v0.23.0: optional — a metricless "spec loop" (measure=none) has no
+   * metric, no direction, and NO plateau stop; it ends only at max/time/
+   * tokens bounds or /loop stop. */
+  measureCmd?: string;
+  direction?: LoopDirection;
   iteration: number;
+  /** v0.23.0: 0 = unbounded (no iteration cap). Default 50. */
   maxIterations: number;
   plateauWindow: number;
   stallCount: number;
@@ -124,7 +128,7 @@ export type LoopTickOutcome =
  */
 export function applyMeasurement(loop: LoopState, value: number | null, at: string): LoopTickOutcome {
   loop.iteration++;
-  const improved = value !== null && isImprovement(loop.direction, value, loop.bestValue);
+  const improved = value !== null && loop.direction !== undefined && isImprovement(loop.direction, value, loop.bestValue);
   if (value === null) {
     loop.stallCount++;
   } else if (improved) {
@@ -155,7 +159,7 @@ export function applyMeasurement(loop: LoopState, value: number | null, at: stri
     loop.stopReason = `plateau — no improvement in ${loop.plateauWindow} consecutive iterations (best: ${loop.bestValue ?? "n/a"})`;
     return { kind: "stop", reason: loop.stopReason };
   }
-  if (loop.iteration >= loop.maxIterations) {
+  if (loop.maxIterations > 0 && loop.iteration >= loop.maxIterations) {
     loop.active = false;
     loop.stopReason = `max iterations reached (${loop.maxIterations}); best: ${loop.bestValue ?? "n/a"}`;
     return { kind: "stop", reason: loop.stopReason };
@@ -163,11 +167,45 @@ export function applyMeasurement(loop: LoopState, value: number | null, at: stri
   return { kind: "continue", improved, value };
 }
 
+/**
+ * One iteration of a METRICLESS loop (v0.23.0, measure=none). There is no
+ * number to judge movement, so there is no plateau — the loop ends only at
+ * the time/token/iteration bounds or /loop stop. This is the Sisyphus mode:
+ * work the spec until the bounds say stop. The doorknob risk is real and
+ * accepted by the user explicitly; the iteration prompt demands one real,
+ * inspectable change per turn.
+ */
+export function applyMetriclessTick(loop: LoopState, at: string): LoopTickOutcome {
+  loop.iteration++;
+  loop.history.push({ iteration: loop.iteration, value: null, improved: false, at });
+  if (loop.history.length > 200) loop.history.splice(0, loop.history.length - 200);
+
+  if (loop.timeLimitHours !== undefined) {
+    const elapsedH = (Date.parse(at) - Date.parse(loop.startedAt)) / 3_600_000;
+    if (Number.isFinite(elapsedH) && elapsedH >= loop.timeLimitHours) {
+      loop.active = false;
+      loop.stopReason = `time bound reached (${loop.timeLimitHours}h) after ${loop.iteration} iterations`;
+      return { kind: "stop", reason: loop.stopReason };
+    }
+  }
+  if (loop.tokenBudget !== undefined && (loop.tokensUsed ?? 0) >= loop.tokenBudget) {
+    loop.active = false;
+    loop.stopReason = `token budget exhausted (${(loop.tokensUsed ?? 0).toLocaleString()} >= ${loop.tokenBudget.toLocaleString()}) after ${loop.iteration} iterations`;
+    return { kind: "stop", reason: loop.stopReason };
+  }
+  if (loop.maxIterations > 0 && loop.iteration >= loop.maxIterations) {
+    loop.active = false;
+    loop.stopReason = `max iterations reached (${loop.maxIterations})`;
+    return { kind: "stop", reason: loop.stopReason };
+  }
+  return { kind: "continue", improved: false, value: null };
+}
+
 /** Parse `/loop start` args into a config. Throws on missing pieces. */
 export function parseLoopStartArgs(raw: string): {
   target: string;
   measureCmd: string;
-  direction: LoopDirection;
+  direction?: LoopDirection;
   plateauWindow: number;
   maxIterations: number;
   branch: boolean;
@@ -196,10 +234,14 @@ export function parseLoopStartArgs(raw: string): {
   target += rest.slice(cursor);
   target = target.trim().replace(/^["']|["']$/g, "").trim();
 
-  const measureCmd = kv.get("measure") ?? "";
-  if (!measureCmd) throw new Error('missing measure="<shell command that prints a number>"');
+  const measureRaw = (kv.get("measure") ?? "").trim();
+  // v0.23.0: measure=none → metricless "spec loop" (Sisyphus mode). No
+  // metric, no direction, no plateau — bounds and /loop stop only.
+  const metricless = measureRaw.toLowerCase() === "none";
+  if (!measureRaw) throw new Error('missing measure="<shell command that prints a number>" (or measure=none for a metricless spec loop — no plateau, ends only at bounds or /loop stop)');
   const dirRaw = (kv.get("direction") ?? "").toLowerCase();
-  if (dirRaw !== "min" && dirRaw !== "max") throw new Error("missing direction=min|max");
+  if (metricless && dirRaw) throw new Error("direction= is meaningless with measure=none — there is no metric to have a direction");
+  if (!metricless && dirRaw !== "min" && dirRaw !== "max") throw new Error("missing direction=min|max");
   if (!target) throw new Error("missing target (what to improve), e.g. /loop start \"reduce test failures\" measure=\"...\" direction=min");
 
   const window = Number.parseInt(kv.get("window") ?? "", 10);
@@ -218,10 +260,11 @@ export function parseLoopStartArgs(raw: string): {
   const tokensRaw = Number.parseInt(kv.get("tokens") ?? "", 10);
   return {
     target,
-    measureCmd,
-    direction: dirRaw,
+    measureCmd: metricless ? "" : measureRaw,
+    direction: metricless ? undefined : dirRaw as LoopDirection,
     plateauWindow: Number.isFinite(window) && window > 0 ? window : LOOP_DEFAULTS.plateauWindow,
-    maxIterations: Number.isFinite(max) && max > 0 ? max : LOOP_DEFAULTS.maxIterations,
+    // v0.23.0: max=0 = truly unbounded (no iteration cap); absent = 50.
+    maxIterations: kv.has("max") ? (Number.isFinite(max) && max >= 0 ? max : LOOP_DEFAULTS.maxIterations) : LOOP_DEFAULTS.maxIterations,
     branch: branchRaw === "1" || branchRaw === "true" || branchRaw === "yes",
     force: forceRaw === "1" || forceRaw === "true" || forceRaw === "yes",
     timeLimitHours: Number.isFinite(timeRaw) && timeRaw > 0 ? timeRaw : undefined,
