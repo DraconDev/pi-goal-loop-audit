@@ -41,8 +41,9 @@ Four top-level commands, that's all:
 /goal tweak "<new objective>"      # edit in place (Confirm dialog)
 /goal archive                      # archived goals, newest first
 /glla                               # open the settings UI (or /glla key=value)
+/list fix the login bug, add dark mode, write docs   # dump it — the agent decomposes into items, one Confirm
 /list add                          # draft a contract (or a whole batch via items[])
-/list add "<objective>"            # queue one directly
+/list add "<objective>"            # queue one directly — no interview (the /goal start of lists)
 /list add plan.md                  # file detected → bulk import, one Confirm
 /list add <paste a checklist>      # multi-line paste → same batch flow
 

@@ -35,6 +35,7 @@ import {
   parseListImport,
   resolveImportFile,
   routeGoalArgs,
+  routeListText,
   sumNewAssistantTokens,
   takeAt,
   goalArgsNeedDrafting,
@@ -434,7 +435,7 @@ async function startDrafting(ctx: ExtensionContext, target: "goal" | "list" | "l
   const [file, label, tool] = prompts[target]!;
   ctx.ui.notify(
     seed
-      ? `${label}: the objective has no "Done when:" clause — the agent will grill you about it first (nothing activates until you confirm). Skip the interview entirely: /goal start <objective>.`
+      ? `${label}: the objective has no "Done when:" clause — the agent will grill you about it first (nothing activates until you confirm). Skip the interview entirely: ${target === "list" ? "/list add <objective>" : "/goal start <objective>"}.`
       : `${label} started. The agent will grill until the contract is concrete, then ${tool} opens a Confirm dialog. No work begins before confirmation.`,
     "info",
   );
@@ -724,7 +725,7 @@ async function cmdList(args: string, ctx: ExtensionContext): Promise<void> {
       lines.push("Active: (none)");
     }
     if (queue.length === 0) {
-      lines.push("List: empty. /list add <objective> | /list add <file>");
+      lines.push("List: empty. /list <describe your tasks> | /list add <one item, no interview> | /list add <file>");
     } else {
       lines.push(`Queue (${queue.length}):`);
       const PAGE = 15;
@@ -2197,7 +2198,7 @@ export default function (pi: ExtensionAPI): void {
     handler: settingsHandler,
   });
   pi.registerCommand("list", {
-    description: "Loop 2: the list of audited goals — order is the default, not the law. /list add <obj or file or paste> | /list show | /list next [n] | /list remove <n> | /list clear",
+    description: "Loop 2: the list of audited goals — order is the default, not the law. /list <describe your tasks> (agent decomposes into items, one Confirm) | /list add <item or file> (direct, no interview) | /list show | /list next [n] | /list remove <n> | /list clear",
     handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdList(args, ctx); },
   });
   pi.registerCommand("loop", {

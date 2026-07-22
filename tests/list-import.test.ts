@@ -9,7 +9,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
 
-import { parseListImport, resolveImportFile } from "../extensions/goal-loop-core.ts";
+import { parseListImport, resolveImportFile, routeListText } from "../extensions/goal-loop-core.ts";
 
 test("markdown checklist", () => {
   const items = parseListImport("- [ ] first task\n- [x] done task\n- [ ] third task");
@@ -117,4 +117,35 @@ test("resolveImportFile: directories are not importable", () => {
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }
+});
+
+// v0.18.0: conversational /list — dump text, get a decomposed list
+test("routeListText: file path wins over everything", () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "glla-route-"));
+  fs.writeFileSync(path.join(cwd, "plan.md"), "- a\n- b\n");
+  const r = routeListText(cwd, "plan.md");
+  assert.equal(r.kind, "file");
+  fs.rmSync(cwd, { recursive: true, force: true });
+});
+
+test("routeListText: multi-line paste is an explicit batch", () => {
+  const r = routeListText("/nonexistent", "fix x\ndo y\nclean z");
+  assert.equal(r.kind, "batch");
+  if (r.kind === "batch") assert.equal(r.items.length, 3);
+});
+
+test("routeListText: 'Done when:' clause adds directly, no interview", () => {
+  const r = routeListText("/nonexistent", "fix the flaky login test. Done when: npm test is green");
+  assert.equal(r.kind, "direct");
+});
+
+test("routeListText: vague dump goes to conversational drafting", () => {
+  const r = routeListText("/nonexistent", "fix the login bug, add dark mode, write the docs");
+  assert.equal(r.kind, "draft");
+  if (r.kind === "draft") assert.equal(r.seed, "fix the login bug, add dark mode, write the docs");
+});
+
+test("routeListText: nonexistent file-ish text is not a file", () => {
+  const r = routeListText("/nonexistent", "plan.md");
+  assert.equal(r.kind, "draft"); // no Done-when → draft, not a usage error
 });

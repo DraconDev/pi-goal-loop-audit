@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.18.0] — 2026-07-22
+
+### Added — conversational `/list`: dump text, get a decomposed list
+
+`/list fix the login bug, add dark mode, write docs` used to hit a usage
+error (unknown verb "fix") — and `/list add` of the same text queued ONE
+monolithic objective. Now an unknown first word is treated as a
+natural-language dump and routed by detection (new `routeListText`):
+
+- file path → bulk import (sisyphus/Ralph plan file, unchanged)
+- multi-line paste → batch add (structure already explicit, unchanged)
+- contains `Done when:` → one direct item, no interview
+- anything else → **drafting session**: the agent decomposes the dump into
+  `items[]`, one Confirm adds the whole batch
+
+`/list add <text>` stays the explicit direct path — the `/goal start` of
+lists — for when you know it's one item. The list-drafting notice now
+names the right escape hatch (`/list add`, not `/goal start`), and the
+empty-list hint teaches the conversational form.
+
+## [0.17.1] — 2026-07-22
+
 ## [0.17.1] — 2026-07-22
 
 ### Fixed — four `/gla` strings the 0.17.0 sweep missed
