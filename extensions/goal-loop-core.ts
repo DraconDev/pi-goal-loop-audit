@@ -181,7 +181,7 @@ export function routeGoalArgs(raw: string): GoalRoute {
 /**
  * Parse a bulk list-import file (v0.8.1): markdown checklists (`- [ ]`,
  * `- [x]`), bullets (`-`, `*`, `•`), numbered items (`1.`, `2)`), and plain
- * lines all become queue items. Headings (`# …`), blank lines, and HTML
+ * lines all become list items. Headings (`# …`), blank lines, and HTML
  * comments are skipped. A sisyphus-style plan file should import clean.
  */
 export function parseListImport(content: string): string[] {
@@ -357,7 +357,7 @@ export function takeAt<T>(items: T[], n: number): [T, T[]] | null {
 
 export interface State {
   goal: Goal | null;
-  /** Loop 2: queue of pending goal items. Activated one at a time. */
+  /** Loop 2: list of pending goal items. Activated one at a time. */
   list?: ListItem[];
   /** Loop 3: metric-driven forever loop. */
   loop?: import("./goal-loop-forever.js").LoopState;

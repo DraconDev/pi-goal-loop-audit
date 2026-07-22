@@ -119,8 +119,6 @@ budget for huge lists — not a number in code.
 
 ## [0.19.0] — 2026-07-22
 
-## [0.19.0] — 2026-07-22
-
 ### Changed — `/list add` is now a no-op alias; detection routes everything
 
 The verb was redundant: `/list plan.md` already imported via detection, so

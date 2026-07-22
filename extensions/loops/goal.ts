@@ -1856,7 +1856,8 @@ interface Settings {
   auditorThinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
   /** Shell command run on goal complete / goal pause / loop stop; message passed as $1. */
   notifyCmd?: string;
-  /** Per-goal token budget; crossing it pauses the goal. Default 1,000,000. */
+  /** Per-goal token budget; crossing it pauses the goal. Off by default
+   * (opt-in guard, v0.12.0): unset/0 = no budget. */
   tokenLimit?: number;
   /** on → restored goals/loops/lists auto-resume even in fresh sessions
    * (unattended rigs). Default off: restore holds until /goal resume. */
