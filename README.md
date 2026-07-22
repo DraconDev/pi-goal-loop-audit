@@ -41,11 +41,11 @@ Four top-level commands, that's all:
 /goal tweak "<new objective>"      # edit in place (Confirm dialog)
 /goal archive                      # archived goals, newest first
 /glla                               # open the settings UI (or /glla key=value)
-/list fix the login bug, add dark mode, write docs   # dump it — the agent decomposes into items, one Confirm
-/list add                          # draft a contract (or a whole batch via items[])
-/list add "<objective>"            # queue one directly — no interview (the /goal start of lists)
-/list add plan.md                  # file detected → bulk import, one Confirm
-/list add <paste a checklist>      # multi-line paste → same batch flow
+/list fix the login bug, add dark mode, write docs   # dump it — the agent shapes it into items, one Confirm
+/list plan.md                      # file detected → bulk import, one Confirm (sisyphus/Ralph style)
+/list <paste a checklist>          # multi-line paste → same batch flow
+/list "fix the flaky test. Done when: npm test green"   # explicit contract → queues directly, no interview
+/list                              # show the list (add/import are optional no-op aliases — detection routes everything)
 
 (Or just say it: "queue these 10 things…" — the agent manages the list too.)
 
@@ -82,9 +82,9 @@ ONE confirmed batch, not 50 dialogs.
 Note: every queue item is audited individually, so at hundreds of items the
 audit cost per item is the thing to think about.
 
-**Drafting is the default for long-running things.** `/goal`, `/list add`, and
-`/loop` with no arguments all start a grilling turn that ends in a Confirm
-dialog. For `/loop` specifically, the orchestrator **test-runs the proposed
+**Drafting is the default for long-running things.** `/goal` and
+`/loop` with no arguments — and any vague `/list` dump — all start a
+grilling turn that ends in a Confirm dialog. For `/loop` specifically, the orchestrator **test-runs the proposed
 measure command once** and shows the real number in the dialog — you validate
 the metric before a single iteration burns tokens.
 
@@ -132,8 +132,8 @@ redirect you to `/goal`.
 | Loop | Command | Status |
 |---|---|---|
 | 1. Single ordered goal | `/goal "<objective>"` | **shipped v0.1.0** |
-| 2. Queue of goals | `/list add\|show\|next\|remove\|clear` | **shipped v0.2.0** |
-| 3. Forever-polish loop | `/loop start\|status\|stop` | **shipped v0.3.0** |
+| 2. Queue of goals | `/list [show\|next\|remove\|clear]` | **shipped v0.2.0** |
+| 3. Metric-driven process loop | `/loop start\|status\|stop` | **shipped v0.3.0** |
 
 Each loop is a different policy class on the same status machine.
 

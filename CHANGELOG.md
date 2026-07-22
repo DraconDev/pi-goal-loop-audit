@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.19.0] — 2026-07-22
+
+### Changed — `/list add` is now a no-op alias; detection routes everything
+
+The verb was redundant: `/list plan.md` already imported via detection, so
+`add`'s only real job was forcing vague text past the interview. But a list
+item activates RAW when it reaches the head — the drafting interview is the
+only quality gate an item ever gets, and a verb whose sole purpose was
+skipping that gate was a leak, not an escape hatch. Now `add` and `import`
+are stripped and the rest routes through `routeListText` exactly like
+verb-less text: file → import, paste → batch, `Done when:` → direct,
+anything else → drafting. Muscle memory (`/list add plan.md`) keeps working.
+The list-drafting notice now names the real direct path: include a
+`Done when:` clause. Also swept the last "Forever-polish loop" framing from
+the README decision table.
+
+## [0.18.1] — 2026-07-22
+
 ## [0.18.1] — 2026-07-22
 
 ### Fixed — Confirm-gate bypass: agent queued list items directly mid-draft
