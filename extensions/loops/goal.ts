@@ -55,6 +55,7 @@ import {
   piGlaDir,
   readState,
   renderGoalMarkdown,
+  shouldAutoResumeOnSessionStart,
   statusLabel,
   writeGoalMd,
 } from "../goal-loop-core.js";
@@ -87,6 +88,8 @@ import {
 
 const GOAL_EVENT_ENTRY = "goal-event";
 const STATE_ENTRY = "goal-state";
+/** stopReason marker for a loop held (not stopped) by the fresh-session restore gate. */
+const HELD_ON_RESTORE = "held: restored in a fresh session";
 
 // =================================================================
 // Module-level state (one per session)
@@ -1142,10 +1145,22 @@ async function cmdLoop(args: string, ctx: ExtensionContext): Promise<void> {
   const rest = args.trim().slice(sub.length).trim();
 
   if (!sub) {
-    // /loop with no args → draft the loop config (metric design is the whole
-    // game for a long-running loop; never start one blind).
+    // /loop with no args → resume a held loop if one is waiting; otherwise
+    // draft the loop config (metric design is the whole game for a
+    // long-running loop; never start one blind).
     if (isLoopActive()) {
       ctx.ui.notify("A loop is already active — /loop status to inspect, /loop stop to end it.", "info");
+      return;
+    }
+    const stored = state.loop;
+    if (stored && !stored.active && stored.stopReason === HELD_ON_RESTORE) {
+      state.loop = { ...stored, active: true, stopReason: undefined };
+      persistState(ctx);
+      scheduleLoopTick(ctx);
+      ctx.ui.notify(
+        `Loop resumed: iteration ${stored.iteration}/${stored.maxIterations} · best ${stored.bestValue ?? "n/a"} — ${stored.target.slice(0, 60)}`,
+        "info",
+      );
       return;
     }
     await startDrafting(ctx, "loop");
@@ -2242,7 +2257,7 @@ export default function (pi: ExtensionAPI): void {
     }
   });
 
-  pi.on("session_start", async (_event: any, ctx: ExtensionContext) => {
+  pi.on("session_start", async (event: any, ctx: ExtensionContext) => {
     rememberCtx(ctx);
     state = readState(ctx.cwd);
     if (!registeredCtx) {
@@ -2251,27 +2266,60 @@ export default function (pi: ExtensionAPI): void {
     }
     warnOnCommandCollision(ctx);
     warnIfAuditorProviderRisky(ctx);
-    // Resumption notice: make persisted supervisor state visible on startup.
+    // Restore gate (v0.21.0): a fresh session ("startup"/"new", or a pi too
+    // old to report a reason) has no conversation context for the restored
+    // work — HOLD instead of auto-firing, so opening pi in a folder never
+    // starts working before you can even load your session. Sessions with
+    // history ("resume"/"reload"/"fork") auto-resume; /glla autoresume=on
+    // opts a project into auto-resume everywhere (unattended rigs).
+    const autoResume = shouldAutoResumeOnSessionStart(event?.reason, loadSettings(ctx.cwd).autoResume);
     if (isLoopActive()) {
       const l = state.loop!;
-      ctx.ui.notify(
-        `Resuming loop (iteration ${l.iteration}/${l.maxIterations}, best ${l.bestValue ?? "n/a"}, stall ${l.stallCount}/${l.plateauWindow}): ${l.target.slice(0, 60)}`,
-        "info",
-      );
-    } else if (state.goal && state.goal.status === "active") {
-      ctx.ui.notify(
-        `Resuming goal [${state.goal.id}]: ${state.goal.objective.slice(0, 70)}${listQueue().length > 0 ? ` (+${listQueue().length} queued)` : ""}`,
-        "info",
-      );
-    }
-    if (isLoopActive()) {
-      // Session restarted mid-loop: resume measuring from persisted state.
-      scheduleLoopTick(ctx);
+      if (autoResume) {
+        ctx.ui.notify(
+          `Resuming loop (iteration ${l.iteration}/${l.maxIterations}, best ${l.bestValue ?? "n/a"}, stall ${l.stallCount}/${l.plateauWindow}): ${l.target.slice(0, 60)}`,
+          "info",
+        );
+        scheduleLoopTick(ctx);
+      } else {
+        state.loop = { ...l, active: false, stopReason: HELD_ON_RESTORE };
+        persistState(ctx);
+        ctx.ui.notify(
+          `Loop held on restore (fresh session, no work started): ${l.target.slice(0, 60)} — /loop to resume, /glla autoresume=on to auto-resume in this project.`,
+          "info",
+        );
+      }
     } else if (state.goal && state.goal.status === "active" && state.goal.autoContinue) {
-      scheduleContinuation(ctx, true);
+      if (autoResume) {
+        ctx.ui.notify(
+          `Resuming goal [${state.goal.id}]: ${state.goal.objective.slice(0, 70)}${listQueue().length > 0 ? ` (+${listQueue().length} queued)` : ""}`,
+          "info",
+        );
+        scheduleContinuation(ctx, true);
+      } else {
+        updateGoal({
+          status: "paused",
+          pauseReason: "restored in a fresh session — no work started",
+          pauseSuggestedAction: "/goal resume to continue · /glla autoresume=on to auto-resume in this project",
+        }, ctx);
+        ctx.ui.notify(
+          `Goal held on restore [${state.goal.id}]: ${state.goal.objective.slice(0, 70)} — /goal resume to continue.`,
+          "info",
+        );
+      }
+    } else if (state.goal && state.goal.status === "active") {
+      // Active but autoContinue off: nothing auto-fires — just surface it.
+      ctx.ui.notify(
+        `Restored goal [${state.goal.id}]: ${state.goal.objective.slice(0, 70)}${listQueue().length > 0 ? ` (+${listQueue().length} queued)` : ""}`,
+        "info",
+      );
     } else if ((!state.goal || state.goal.status === "complete" || state.goal.status === "aborted") && listQueue().length > 0) {
-      // Session restarted with a non-empty queue but no active goal.
-      activateNextListItem(ctx);
+      if (autoResume) {
+        // Session restarted with a non-empty queue but no active goal.
+        activateNextListItem(ctx);
+      } else {
+        ctx.ui.notify(`List has ${listQueue().length} item(s) waiting — /list next to activate the head.`, "info");
+      }
     }
   });
 
