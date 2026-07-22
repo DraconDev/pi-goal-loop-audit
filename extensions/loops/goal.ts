@@ -2316,6 +2316,12 @@ export default function (pi: ExtensionAPI): void {
         ctx.ui.notify(`List has ${listQueue().length} item(s) waiting — /list next to activate the head.`, "info");
       }
     }
+    // Always paint on session load (v0.22.1): the branches above only reach
+    // refreshUI via persistState, so a goal that was ALREADY paused (or any
+    // state that doesn't mutate on load) rendered nothing — "can't tell if
+    // it's on" is a bug. Painting unconditionally also clears/refreshes any
+    // stale widget carried over from a previous in-process session.
+    refreshUI(ctx);
   });
 
   pi.on("agent_end", async (event: any, ctx: ExtensionContext) => {
