@@ -33,7 +33,7 @@ import {
   DEFAULT_TOKEN_LIMIT,
   mergeSettings,
   parseListImport,
-  resolveImportFile,
+
   routeGoalArgs,
   routeListText,
   listMutationBlocked,
@@ -437,7 +437,7 @@ async function startDrafting(ctx: ExtensionContext, target: "goal" | "list" | "l
   const [file, label, tool] = prompts[target]!;
   ctx.ui.notify(
     seed
-      ? `${label}: the objective has no "Done when:" clause — the agent will grill you about it first (nothing activates until you confirm). Skip the interview entirely: ${target === "list" ? "/list add <objective>" : "/goal start <objective>"}.`
+      ? `${label}: the objective has no "Done when:" clause — the agent will grill you about it first (nothing activates until you confirm). ${target === "list" ? "Add directly instead: include a \"Done when:\" clause." : "Skip the interview entirely: /goal start <objective>."}`
       : `${label} started. The agent will grill until the contract is concrete, then ${tool} opens a Confirm dialog. No work begins before confirmation.`,
     "info",
   );
@@ -727,7 +727,7 @@ async function cmdList(args: string, ctx: ExtensionContext): Promise<void> {
       lines.push("Active: (none)");
     }
     if (queue.length === 0) {
-      lines.push("List: empty. /list <describe your tasks> | /list add <one item, no interview> | /list add <file>");
+      lines.push("List: empty. /list <describe your tasks, or a plan file> — the agent shapes dumps into items, files import directly.");
     } else {
       lines.push(`Queue (${queue.length}):`);
       const PAGE = 15;
@@ -741,43 +741,33 @@ async function cmdList(args: string, ctx: ExtensionContext): Promise<void> {
   }
 
 
-  if (sub === "import") {
-    // Backwards-compat alias (0.8.1 shipped it; 0.8.2 folded it into add).
-    const abs = resolveImportFile(ctx.cwd, rest.replace(/^["']|["']$/g, ""));
-    if (!abs) {
-      ctx.ui.notify("Usage: /list add <path> — file detection is automatic now; 'import' is just an alias", "info");
-      return;
-    }
-    await bulkAddFromFile(ctx, abs);
-    return;
-  }
-
-  if (sub === "add") {
-    let raw = rest;
-    if (raw.length >= 2 && ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")))) {
-      raw = raw.slice(1, -1).trim();
-    }
-    if (!raw) {
-      // /list add with no args → draft a confirmed contract INTO THE QUEUE.
+  // v0.19.0: `add` and `import` are pure no-op aliases — the verb changes
+  // nothing, detection routes everything. `/list plan.md` and
+  // `/list add plan.md` both import; `/list fix x, do y` and
+  // `/list add fix x, do y` both draft. Rationale: a list item activates
+  // RAW when it reaches the head, so the drafting interview is the only
+  // quality gate an item ever gets — a verb whose only job was skipping
+  // that gate was a leak, not an escape hatch. The direct path is an
+  // explicit "Done when:" clause (user already did the contract work).
+  if (sub === "add" || sub === "import") {
+    if (!rest) {
       await startDrafting(ctx, "list");
       return;
     }
-    // Explicit verb = explicit intent (the /goal start of lists): file and
-    // multi-line structure are still honored, but vague text adds AS ONE
-    // ITEM — no interview. The conversational path is bare /list <text>.
-    const importFile = resolveImportFile(ctx.cwd, raw);
-    if (importFile) {
-      await bulkAddFromFile(ctx, importFile);
+    const aliased = routeListText(ctx.cwd, rest.replace(/^["']|["']$/g, ""));
+    if (aliased.kind === "file") {
+      await bulkAddFromFile(ctx, aliased.path);
       return;
     }
-    if (raw.includes("\n")) {
-      const pasted = parseListImport(raw);
-      if (pasted.length > 1) {
-        await bulkAddItems(ctx, pasted, "pasted text");
-        return;
-      }
+    if (aliased.kind === "batch") {
+      await bulkAddItems(ctx, aliased.items, "pasted text");
+      return;
     }
-    addSingleItem(ctx, raw);
+    if (aliased.kind === "direct") {
+      addSingleItem(ctx, aliased.text);
+      return;
+    }
+    await startDrafting(ctx, "list", aliased.seed);
     return;
   }
 
@@ -2206,7 +2196,7 @@ export default function (pi: ExtensionAPI): void {
     handler: settingsHandler,
   });
   pi.registerCommand("list", {
-    description: "Loop 2: the list of audited goals — order is the default, not the law. /list <describe your tasks> (agent decomposes into items, one Confirm) | /list add <item or file> (direct, no interview) | /list show | /list next [n] | /list remove <n> | /list clear",
+    description: "Loop 2: the list of audited goals — order is the default, not the law. /list <describe tasks or name a plan file> (dumps get shaped into items, files import, 'Done when:' adds directly) | /list show | /list next [n] | /list remove <n> | /list clear",
     handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdList(args, ctx); },
   });
   pi.registerCommand("loop", {
