@@ -67,7 +67,7 @@ export function buildStatusText(state: State, audit?: AuditDisplayProgress | nul
   if (g.status === "active") {
     const queue = state.list?.length ? ` · list ${state.list.length}` : "";
     const tasks = g.taskList ? ` ${countDone(g)}/${countTotal(g)} tasks ·` : "";
-    return `glla: goal ●${tasks} ${fmtElapsed(now - Date.parse(g.createdAt))}${queue}`;
+    return `glla: ${g.policy} ●${tasks} ${fmtElapsed(now - Date.parse(g.createdAt))}${queue}`;
   }
   return undefined; // complete/aborted → clear
 }
