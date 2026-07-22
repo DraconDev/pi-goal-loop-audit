@@ -81,14 +81,14 @@ test("widget truncation is width-aware (v0.22.2)", () => {
   const longObjective = "x".repeat(200);
   const g = goalOf({ objective: longObjective });
   // No width (tests/RPC): floor cap applies.
-  const narrow = buildWidgetLines({ goal: g, list: [] }, null, NOW)![0];
+  const narrow = buildWidgetLines({ goal: g, list: [] }, null, NOW)![0]!;
   assert.equal(narrow.length, 2 + 64); // icon + space + 63 chars + ellipsis
   // Wide terminal: the head uses the room instead of cutting at 64.
-  const wide = buildWidgetLines({ goal: g, list: [] }, null, NOW, undefined, 160)![0];
+  const wide = buildWidgetLines({ goal: g, list: [] }, null, NOW, undefined, 160)![0]!;
   assert.ok(wide.length > 100, `wide head should exceed 100 chars, got ${wide.length}`);
   assert.ok(wide.length <= 160, `wide head must not exceed the terminal width, got ${wide.length}`);
   // Narrow terminal: never below the floor.
-  const tiny = buildWidgetLines({ goal: g, list: [] }, null, NOW, undefined, 50)![0];
+  const tiny = buildWidgetLines({ goal: g, list: [] }, null, NOW, undefined, 50)![0]!;
   assert.equal(tiny.length, narrow.length);
 });
 

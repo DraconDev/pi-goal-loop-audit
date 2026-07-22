@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.3] — 2026-07-22
+
+### Fixed
+
+- tsc: non-null assertions for the v0.22.2 width test under
+  noUncheckedIndexedAccess (0.22.2 shipped with the test file failing
+  `npm run check`; suite itself was green).
+
 ## [0.22.2] — 2026-07-22
 
 ### Fixed
