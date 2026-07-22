@@ -143,10 +143,11 @@ function goalLines(g: Goal, state: State, audit: AuditDisplayProgress | null | u
         : paint(theme, "success", "●");
   const head = `${icon} ${truncate(g.objective.replace(/\s+/g, " "), 64)}`;
   const statusWord = g.status === "active" ? paint(theme, "success", "active") : g.status;
-  // tokensLimit is always initialized by the orchestrator; the ?? 0 fallback
-  // mirrors DEFAULT_TOKEN_LIMIT (0 = guard off) without a runtime core import.
-  const tokens = paint(theme, "dim", `${fmtTokens(g.usage?.tokensUsed ?? 0)}/${fmtTokens(g.usage?.tokensLimit ?? 0)} tok`);
-  const lines = [head, `├─ ${statusWord} · ${fmtElapsed(now - Date.parse(g.createdAt))} · ${tokens}`];
+  // Token segment only when a budget is set (v0.22.0): the guard is opt-in,
+  // and "0/0 tok" carried no information when off.
+  const tokenLimit = g.usage?.tokensLimit ?? 0;
+  const tokens = tokenLimit > 0 ? ` · ${paint(theme, "dim", `${fmtTokens(g.usage?.tokensUsed ?? 0)}/${fmtTokens(tokenLimit)} tok`)}` : "";
+  const lines = [head, `├─ ${statusWord} · ${fmtElapsed(now - Date.parse(g.createdAt))}${tokens}`];
   if (g.status === "auditing") {
     lines.push(`├─ auditor: ${audit?.label ?? "running"}${audit?.currentTool ? ` · ${truncate(audit.currentTool, 30)}` : ""}`);
     if (audit?.elapsedMs) lines.push(`└─ ${paint(theme, "dim", `${fmtElapsed(audit.elapsedMs)} in isolated session`)}`);

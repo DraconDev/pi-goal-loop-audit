@@ -2139,10 +2139,13 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
 const OUR_COMMANDS = ["goal", "glla", "list", "loop"];
 let collisionWarned = false;
 
-// Providers verified to exist in a bare (extension-less) session. The auditor
-// spawns exactly such a session, so extension-registered providers (kilocode,
-// zenmux on this rig) fail inside it. Unknown providers get a soft one-time
-// notice — not an error, since the built-in set grows over time.
+// Providers known to pi core. The auditor inherits the already-resolved
+// Model object from this session (in-process createAgentSession), so a
+// provider defined in ~/.pi/agent/models.json with auth.json credentials
+// works even though it is not "built-in". Unknown providers get a soft
+// one-time conditional notice: if audits error with auth failures, an
+// explicit /glla model= override is the fix. (v0.22.0: reworded from the
+// stale "extension-registered → auditor fails auth" premise.)
 const KNOWN_BUILTIN_PROVIDERS = new Set([
   "anthropic", "google", "google-vertex", "google-gemini-cli", "openai", "openai-codex",
   "openrouter", "opencode", "azure-openai-responses", "groq", "cerebras", "xai", "zai",
@@ -2159,7 +2162,7 @@ function warnIfAuditorProviderRisky(ctx: ExtensionContext): void {
     const provider = (ctx.model as any)?.provider as string | undefined;
     if (!provider || KNOWN_BUILTIN_PROVIDERS.has(provider)) return;
     ctx.ui.notify(
-      `pi-goal-list-loop-audit: session provider "${provider}" is extension-registered — the auditor (extension-less session) will fail auth with it. If audits error, set a built-in override once: /glla model=provider/id`,
+      `pi-goal-list-loop-audit: session provider "${provider}" is not a known built-in. The auditor inherits the resolved model in-process, so this usually works — but if audits error with auth/provider failures, set an explicit override once: /glla model=provider/id`,
       "info",
     );
   } catch {
