@@ -955,18 +955,23 @@ async function runGit(ctx: ExtensionContext, args: string[]): Promise<{ ok: bool
 }
 
 function loopPrompt(loop: LoopState, regressionNote: string, strategyNote: string, boundsNote: string): string {
-  const tmplPath = path.resolve(__dirname, "..", "..", "prompts", "goal-loop-forever.md");
+  // v0.23.0: metricless loops get their own prompt — no metric section,
+  // anti-doorknob rules instead of anti-gaming rules.
+  const metricless = !loop.measureCmd;
+  const tmplPath = path.resolve(__dirname, "..", "..", "prompts", metricless ? "goal-loop-forever-metricless.md" : "goal-loop-forever.md");
   let tmpl: string;
   try {
     tmpl = fs.readFileSync(tmplPath, "utf-8");
   } catch {
-    tmpl = `[LOOP ITERATION ${loop.iteration + 1}] Target: ${loop.target}. Measure: ${loop.measureCmd} (${loop.direction}). Make ONE small change to improve the metric.`;
+    tmpl = metricless
+      ? `[LOOP ITERATION ${loop.iteration + 1}] Target: ${loop.target}. Metricless spec loop — make ONE real, inspectable change advancing the target. No cosmetic churn.`
+      : `[LOOP ITERATION ${loop.iteration + 1}] Target: ${loop.target}. Measure: ${loop.measureCmd} (${loop.direction}). Make ONE small change to improve the metric.`;
   }
   return tmpl
     .replace(/\$\{ITERATION\}/g, String(loop.iteration + 1))
     .replace(/\$\{TARGET\}/g, loop.target)
-    .replace(/\$\{MEASURE_CMD\}/g, loop.measureCmd)
-    .replace(/\$\{DIRECTION\}/g, loop.direction)
+    .replace(/\$\{MEASURE_CMD\}/g, loop.measureCmd ?? "none")
+    .replace(/\$\{DIRECTION\}/g, loop.direction ?? "none")
     .replace(/\$\{DIRECTION_WORD\}/g, loop.direction === "min" ? "lower is better" : "higher is better")
     .replace(/\$\{LAST_VALUE\}/g, loop.lastValue === null ? "(none yet)" : String(loop.lastValue))
     .replace(/\$\{BEST_VALUE\}/g, loop.bestValue === null ? "(none yet)" : String(loop.bestValue))
@@ -1011,10 +1016,22 @@ function sendLoopTurn(): void {
     ? "**You are one stall from a plateau stop. Small tweaks are not working — try a FUNDAMENTALLY different approach: different file, different technique, or revert and rethink the angle of attack.**"
     : "";
   // v0.15.0: arbitrary bounds (never "completion") — surface what's armed.
+  // v0.23.0: for metricless loops the bounds are the ONLY stop (no
+  // plateau), so the note names that — and an unbounded metricless loop
+  // gets the furnace warning.
+  const metricless = !loop.measureCmd;
   const bounds: string[] = [];
   if (loop.timeLimitHours !== undefined) bounds.push(`${loop.timeLimitHours}h`);
   if (loop.tokenBudget !== undefined) bounds.push(`${loop.tokenBudget.toLocaleString()} tokens (used ${(loop.tokensUsed ?? 0).toLocaleString()})`);
-  const boundsNote = bounds.length ? `\n- Arbitrary bounds: the loop also stops after ${bounds.join(" or ")}` : "";
+  let boundsNote = "";
+  if (metricless) {
+    if (loop.maxIterations > 0) bounds.unshift(`${loop.maxIterations} iterations`);
+    boundsNote = bounds.length
+      ? `\n- Bounds armed: the loop ends after ${bounds.join(" or ")} — or /loop stop. There is NO plateau stop.`
+      : `\n- NO bounds armed — this loop ends only at /loop stop. Spend each iteration like it costs money; it does.`;
+  } else if (bounds.length) {
+    boundsNote = `\n- Arbitrary bounds: the loop also stops after ${bounds.join(" or ")}`;
+  }
   try {
     extensionApi.sendMessage({
       customType: GOAL_EVENT_ENTRY,
@@ -1033,7 +1050,8 @@ async function runLoopTick(ctx: ExtensionContext, event?: any): Promise<void> {
   if (event?.messages) {
     loop.tokensUsed = (loop.tokensUsed ?? 0) + sumNewAssistantTokens(event.messages as unknown[], countedLoopTokenMessages);
   }
-  const value = await runMeasure(ctx, loop.measureCmd);
+  const metricless = !loop.measureCmd;
+  const value = metricless ? null : await runMeasure(ctx, loop.measureCmd!);
   // Hypothesis line (pi-autoresearch's good idea): the agent's stated intent
   // for the turn goes into the ledger, making loop history auditable.
   let hypothesis: string | undefined;
@@ -1042,7 +1060,7 @@ async function runLoopTick(ctx: ExtensionContext, event?: any): Promise<void> {
     const text = last && Array.isArray(last.content) ? last.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n") : "";
     hypothesis = text.match(/^HYPOTHESIS:\s*(.+)$/m)?.[1]?.trim().slice(0, 200);
   }
-  const outcome = applyMeasurement(loop, value, nowIso());
+  const outcome = metricless ? applyMetriclessTick(loop, nowIso()) : applyMeasurement(loop, value, nowIso());
   persistState(ctx);
   appendLedger(ctx.cwd, "loop_measured", {
     iteration: loop.iteration,
@@ -1052,11 +1070,12 @@ async function runLoopTick(ctx: ExtensionContext, event?: any): Promise<void> {
     hypothesis,
   });
   // branch=1 mode: commit improvements, hard-reset regressions — always and
-  // only on the scratch branch.
+  // only on the scratch branch. v0.23.0: a metricless loop has no regression
+  // signal, so every iteration stands and is committed.
   if (loop.branchName && outcome.kind === "continue") {
-    if (outcome.improved) {
+    if (metricless || outcome.improved) {
       await runGit(ctx, ["add", "-A"]);
-      const committed = await runGit(ctx, ["commit", "-m", `pi-glla-loop: iteration ${loop.iteration} (${loop.direction}=${loop.bestValue})`]);
+      const committed = await runGit(ctx, ["commit", "-m", metricless ? `pi-glla-loop: iteration ${loop.iteration}` : `pi-glla-loop: iteration ${loop.iteration} (${loop.direction}=${loop.bestValue})`]);
       appendLedger(ctx.cwd, "loop_git", { action: "commit", iteration: loop.iteration, ok: committed.ok });
     } else {
       const reset = await runGit(ctx, ["reset", "--hard", "HEAD"]);
@@ -1092,8 +1111,9 @@ async function finishLoopGit(ctx: ExtensionContext, loop: LoopState): Promise<vo
 
 interface LoopConfig {
   target: string;
+  /** Empty string = metricless spec loop (v0.23.0). */
   measureCmd: string;
-  direction: "min" | "max";
+  direction?: "min" | "max";
   plateauWindow: number;
   maxIterations: number;
   branch: boolean;
@@ -1132,8 +1152,11 @@ async function startLoopFromConfig(ctx: ExtensionContext, cfg: LoopConfig): Prom
   // produces no number is a footgun: without a baseline the loop burns stall
   // iterations before plateau stops it. Refuse fast (force=1 overrides for
   // measures that only work after the agent builds something first).
-  const baseline = await runMeasure(ctx, cfg.measureCmd);
-  if (baseline === null && !(cfg as { force?: boolean }).force) {
+  // v0.23.0: metricless loops skip the baseline entirely — there is no
+  // measure to run, and no plateau to protect.
+  const metricless = !cfg.measureCmd;
+  const baseline = metricless ? null : await runMeasure(ctx, cfg.measureCmd);
+  if (!metricless && baseline === null && !(cfg as { force?: boolean }).force) {
     ctx.ui.notify(
       `/loop start refused: the measure produced no number.\nCommand: ${cfg.measureCmd}\nFix it so it prints exactly one number, or re-run with force=1 if it only works after the agent builds something first.\n(Non-numeric goal — research, docs, features? Use /goal: the independent auditor verifies semantically. /loop only believes a number.)`,
       "warning",
@@ -1144,7 +1167,7 @@ async function startLoopFromConfig(ctx: ExtensionContext, cfg: LoopConfig): Prom
     ...state,
     loop: {
       target: cfg.target,
-      measureCmd: cfg.measureCmd,
+      measureCmd: cfg.measureCmd || undefined,
       direction: cfg.direction,
       iteration: 0,
       maxIterations: cfg.maxIterations,
@@ -1163,10 +1186,13 @@ async function startLoopFromConfig(ctx: ExtensionContext, cfg: LoopConfig): Prom
     },
   };
   persistState(ctx);
-  appendLedger(ctx.cwd, "loop_started", { target: cfg.target, measureCmd: cfg.measureCmd, direction: cfg.direction, baseline, branch: branchName, timeLimitHours: cfg.timeLimitHours, tokenBudget: cfg.tokenBudget });
+  appendLedger(ctx.cwd, "loop_started", { target: cfg.target, measureCmd: cfg.measureCmd || "none", direction: cfg.direction ?? "none", baseline, branch: branchName, timeLimitHours: cfg.timeLimitHours, tokenBudget: cfg.tokenBudget });
   ctx.ui.notify(
-    `Loop started: ${cfg.target.slice(0, 60)}\nBaseline: ${baseline ?? "(forced without a number — first turn must produce one)"} · direction ${cfg.direction} · window ${cfg.plateauWindow} · max ${cfg.maxIterations}` +
-    (branchName ? `\nbranch mode: committing improvements to ${branchName}` : ""),
+    metricless
+      ? `Loop started (metricless spec loop — NO plateau stop): ${cfg.target.slice(0, 60)}\nEnds only at ${cfg.maxIterations > 0 ? `max ${cfg.maxIterations} iterations` : "no iteration cap"}${cfg.timeLimitHours ? ` · ${cfg.timeLimitHours}h` : ""}${cfg.tokenBudget ? ` · ${cfg.tokenBudget.toLocaleString()} tokens` : ""} · /loop stop. Every iteration must make ONE real, inspectable change — cosmetic churn is the doorknob failure.` +
+        (branchName ? `\nbranch mode: committing each iteration to ${branchName}` : "")
+      : `Loop started: ${cfg.target.slice(0, 60)}\nBaseline: ${baseline ?? "(forced without a number — first turn must produce one)"} · direction ${cfg.direction} · window ${cfg.plateauWindow} · ${cfg.maxIterations > 0 ? `max ${cfg.maxIterations}` : "no iteration cap"}` +
+        (branchName ? `\nbranch mode: committing improvements to ${branchName}` : ""),
     "info",
   );
   scheduleLoopTick(ctx);
@@ -1192,7 +1218,7 @@ async function cmdLoop(args: string, ctx: ExtensionContext): Promise<void> {
       persistState(ctx);
       scheduleLoopTick(ctx);
       ctx.ui.notify(
-        `Loop resumed: iteration ${stored.iteration}/${stored.maxIterations} · best ${stored.bestValue ?? "n/a"} — ${stored.target.slice(0, 60)}`,
+        `Loop resumed: iteration ${stored.iteration}/${stored.maxIterations > 0 ? stored.maxIterations : "∞"} · best ${stored.bestValue ?? "n/a"} — ${stored.target.slice(0, 60)}`,
         "info",
       );
       return;
@@ -1209,8 +1235,8 @@ async function cmdLoop(args: string, ctx: ExtensionContext): Promise<void> {
     }
     const lines = [
       `Loop: ${loop.active ? "active" : "stopped"} — ${loop.target.slice(0, 80)}`,
-      `Metric: ${loop.measureCmd} (${loop.direction})`,
-      `Iteration ${loop.iteration}/${loop.maxIterations} · best ${loop.bestValue ?? "n/a"} · last ${loop.lastValue ?? "n/a"} · stall ${loop.stallCount}/${loop.plateauWindow}`,
+      `Metric: ${loop.measureCmd ? `${loop.measureCmd} (${loop.direction})` : "none — metricless spec loop (no plateau)"}`,
+      `Iteration ${loop.iteration}/${loop.maxIterations > 0 ? loop.maxIterations : "∞"} · best ${loop.bestValue ?? "n/a"} · last ${loop.lastValue ?? "n/a"} · stall ${loop.stallCount}/${loop.plateauWindow}`,
     ];
     const bounds: string[] = [];
     if (loop.timeLimitHours !== undefined) bounds.push(`time ≤ ${loop.timeLimitHours}h`);
@@ -2392,7 +2418,7 @@ export default function (pi: ExtensionAPI): void {
       const l = state.loop!;
       if (autoResume) {
         ctx.ui.notify(
-          `Resuming loop (iteration ${l.iteration}/${l.maxIterations}, best ${l.bestValue ?? "n/a"}, stall ${l.stallCount}/${l.plateauWindow}): ${l.target.slice(0, 60)}`,
+          `Resuming loop (iteration ${l.iteration}/${l.maxIterations > 0 ? l.maxIterations : "∞"}, best ${l.bestValue ?? "n/a"}, stall ${l.stallCount}/${l.plateauWindow}): ${l.target.slice(0, 60)}`,
           "info",
         );
         scheduleLoopTick(ctx);
