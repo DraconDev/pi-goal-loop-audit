@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.17.0] — 2026-07-22
+
+### Breaking — no relics: aliases removed, state dir renamed
+
+Self-audit after the rename. A rename that keeps aliases is a rename that
+didn't happen.
+
+- `/gla` alias **removed** — `/glla` is the only settings command.
+- `/queue` alias **removed** — `/list` since 0.10.0, the training wheels
+  stayed three releases too long.
+- Status/widget prefix `gla:` → `glla:`; widget keys `pi-gla` → `pi-glla`.
+- State dir `.pi-gla` → `.pi-glla` with a one-time automatic migration
+  (existing goals, ledgers, and project settings move; no state is lost).
+- Every user-facing string (error messages, header comments, docs, smoke
+  script) now says `/glla` and `.pi-glla`.
+
+### Fixed — tooltip drift: `/loop` description advertised a removed strategy
+
+The command tooltip still showed `[done=<value>]` — an option that throws
+since 0.15.0 — and the "forever loop" framing predates the repositioning.
+New description states the agreed philosophy: *"metric-driven process — it
+never completes… 'Improve until X' is a /goal, not a loop"* with the real
+parameters `[time=<hours>] [tokens=<budget>] [branch=1]`. Also: tool
+description "queue item" → "list item".
+
+## [0.16.0] — 2026-07-22
+
 ## [0.16.0] — 2026-07-22
 
 ### Added — `/goal start <objective>`: the explicit skip-draft

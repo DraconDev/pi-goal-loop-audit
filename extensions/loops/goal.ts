@@ -11,7 +11,7 @@
  *   /goal "<objective>" | /goal (draft) | /goal status|pause|resume|cancel|tweak <text>|archive
  *   /list add|show|next|remove|clear
  *   /loop (draft) | /loop start|status|stop
- *   /gla (settings UI) | /gla key=value | /gla project key=value
+ *   /glla (settings UI) | /glla key=value | /glla project key=value
  */
 
 import * as fs from "node:fs";
@@ -545,7 +545,7 @@ async function cmdStatus(ctx: ExtensionContext): Promise<void> {
     `Objective: ${g.objective}`,
     `Auto-continue: ${g.autoContinue ? "on" : "off"}`,
     `Iteration: ${iterationCounter}`,
-    `Tokens: ${(g.usage?.tokensUsed ?? 0).toLocaleString()}${(g.usage?.tokensLimit ?? 0) > 0 ? ` / ${(g.usage!.tokensLimit).toLocaleString()}` : " (no cap — /gla tokenlimit=<n> to set)"}`,
+    `Tokens: ${(g.usage?.tokensUsed ?? 0).toLocaleString()}${(g.usage?.tokensLimit ?? 0) > 0 ? ` / ${(g.usage!.tokensLimit).toLocaleString()}` : " (no cap — /glla tokenlimit=<n> to set)"}`,
   ];
   if (g.auditHistory && g.auditHistory.length > 0) {
     lines.push(`Audits: ${g.auditHistory.length} (${g.auditHistory.filter((v) => v.approved).length} approved)`);

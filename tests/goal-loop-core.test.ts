@@ -50,7 +50,7 @@ function tmpCwd(): string {
 // ---- tests ----
 
 test("piGlaDir returns the canonical path", () => {
-  assert.equal(piGlaDir("/x/y"), path.join("/x/y", ".pi-gla"));
+  assert.equal(piGlaDir("/x/y"), path.join("/x/y", ".pi-glla"));
 });
 
 test("newGoalId format", () => {
@@ -270,12 +270,12 @@ test("mergeSettings: does not mutate the base", () => {
   assert.equal(base.a, 1);
 });
 
-test("ensureDirs creates the .pi-gla tree", () => {
+test("ensureDirs creates the .pi-glla tree", () => {
   const cwd = tmpCwd();
   try {
     ensureDirs(cwd);
-    assert.ok(fs.existsSync(path.join(cwd, ".pi-gla", "goals")));
-    assert.ok(fs.existsSync(path.join(cwd, ".pi-gla", "archive")));
+    assert.ok(fs.existsSync(path.join(cwd, ".pi-glla", "goals")));
+    assert.ok(fs.existsSync(path.join(cwd, ".pi-glla", "archive")));
   } finally {
     fs.rmSync(cwd, { recursive: true, force: true });
   }
@@ -298,4 +298,23 @@ test("sumNewAssistantTokens falls back to totalTokens when no split", () => {
 
 test("DEFAULT_TOKEN_LIMIT is 0 — the guard is opt-in (v0.12.0)", () => {
   assert.equal(DEFAULT_TOKEN_LIMIT, 0);
+});
+
+test("piGlaDir migrates a legacy .pi-gla dir exactly once (v0.17.0)", () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "glla-mig-"));
+  fs.mkdirSync(path.join(cwd, ".pi-gla", "goals"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, ".pi-gla", "active.jsonl"), "{\"a\":1}\n");
+  const dir = piGlaDir(cwd);
+  assert.equal(dir, path.join(cwd, ".pi-glla"));
+  assert.ok(fs.existsSync(path.join(cwd, ".pi-glla", "active.jsonl")), "state moved");
+  assert.ok(!fs.existsSync(path.join(cwd, ".pi-gla")), "legacy dir gone");
+  // idempotent: second call does not clobber
+  fs.writeFileSync(path.join(cwd, ".pi-glla", "active.jsonl"), "{\"a\":2}\n");
+  piGlaDir(cwd);
+  assert.equal(fs.readFileSync(path.join(cwd, ".pi-glla", "active.jsonl"), "utf8"), "{\"a\":2}\n");
+  // if BOTH exist, the new dir wins and legacy is left alone
+  fs.mkdirSync(path.join(cwd, ".pi-gla"), { recursive: true });
+  piGlaDir(cwd);
+  assert.ok(fs.existsSync(path.join(cwd, ".pi-gla")), "legacy untouched when new exists");
+  fs.rmSync(cwd, { recursive: true, force: true });
 });

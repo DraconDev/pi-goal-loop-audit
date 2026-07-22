@@ -297,7 +297,7 @@ export async function runGoalCompletionAuditor(args: {
         output,
         model: modelLabel(model),
         thinkingLevel,
-        error: `Auditor produced no output${streamError ? `: ${streamError}` : " — the auditor session likely failed (check the model's auth/quota, or set a working one with /gla model=provider/id)"}`,
+        error: `Auditor produced no output${streamError ? `: ${streamError}` : " — the auditor session likely failed (check the model's auth/quota, or set a working one with /glla model=provider/id)"}`,
       };
     }
 

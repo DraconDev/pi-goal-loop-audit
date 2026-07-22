@@ -60,7 +60,7 @@ test("empty state → undefined (segment cleared)", () => {
 
 test("active goal shows pulse + elapsed", () => {
   const s = buildStatusText({ goal: goalOf(), list: [] }, null, NOW)!;
-  assert.match(s, /gla: goal ●/);
+  assert.match(s, /glla: goal ●/);
   assert.match(s, /3m/);
 });
 
