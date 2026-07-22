@@ -9,6 +9,7 @@ import * as assert from "node:assert/strict";
 
 import {
   applyMeasurement,
+  applyMetriclessTick,
   applyRefinement,
   isImprovement,
   loopBranchName,
@@ -284,4 +285,91 @@ test("applyRefinement: measure change re-baselines and resets stall", () => {
   assert.equal(loop.lastValue, 42);
   assert.equal(loop.stallCount, 0);
   assert.equal(loop.refinements!.length, 1);
+});
+
+// ---- v0.23.0: metricless spec loops (measure=none) ----
+
+function freshMetriclessLoop(overrides: Partial<LoopState> = {}): LoopState {
+  return {
+    target: "keep improving SPEC.md",
+    iteration: 0,
+    maxIterations: 10,
+    plateauWindow: 3,
+    stallCount: 0,
+    bestValue: null,
+    lastValue: null,
+    active: true,
+    history: [],
+    startedAt: "2026-07-20T00:00:00Z",
+    ...overrides,
+  };
+}
+
+test("parseLoopStartArgs: measure=none yields a metricless config", () => {
+  const cfg = parseLoopStartArgs('"keep improving SPEC.md" measure=none');
+  assert.equal(cfg.target, "keep improving SPEC.md");
+  assert.equal(cfg.measureCmd, "");
+  assert.equal(cfg.direction, undefined);
+  assert.equal(cfg.maxIterations, 50); // default cap still applies
+});
+
+test("parseLoopStartArgs: measure=NONE is case-insensitive", () => {
+  const cfg = parseLoopStartArgs('"work the spec" measure=NONE max=5');
+  assert.equal(cfg.measureCmd, "");
+  assert.equal(cfg.maxIterations, 5);
+});
+
+test("parseLoopStartArgs: direction with measure=none throws", () => {
+  assert.throws(() => parseLoopStartArgs('"x" measure=none direction=min'), /direction= is meaningless/);
+});
+
+test("parseLoopStartArgs: missing measure throws and points at measure=none", () => {
+  assert.throws(() => parseLoopStartArgs('"x" direction=min'), /measure=none/);
+});
+
+test("parseLoopStartArgs: max=0 = truly unbounded; absent max = 50", () => {
+  assert.equal(parseLoopStartArgs('"x" measure="echo 1" direction=min max=0').maxIterations, 0);
+  assert.equal(parseLoopStartArgs('"x" measure="echo 1" direction=min').maxIterations, 50);
+});
+
+test("applyMetriclessTick: iterates without plateau and never improves", () => {
+  const loop = freshMetriclessLoop({ maxIterations: 0 });
+  for (let i = 0; i < 20; i++) {
+    const outcome = applyMetriclessTick(loop, "2026-07-20T01:00:00Z");
+    assert.equal(outcome.kind, "continue");
+    if (outcome.kind === "continue") assert.equal(outcome.improved, false);
+  }
+  assert.equal(loop.iteration, 20);
+  assert.equal(loop.stallCount, 0); // no numbers, no stalls — plateau can never fire
+  assert.equal(loop.active, true); // max=0 = unbounded: still going past 20
+});
+
+test("applyMetriclessTick: max iterations still stops the loop", () => {
+  const loop = freshMetriclessLoop({ maxIterations: 3 });
+  applyMetriclessTick(loop, "2026-07-20T01:00:00Z");
+  applyMetriclessTick(loop, "2026-07-20T01:01:00Z");
+  const outcome = applyMetriclessTick(loop, "2026-07-20T01:02:00Z");
+  assert.equal(outcome.kind, "stop");
+  assert.match(outcome.kind === "stop" ? outcome.reason : "", /max iterations reached \(3\)/);
+  assert.equal(loop.active, false);
+});
+
+test("applyMetriclessTick: time and token bounds still stop the loop", () => {
+  const byTime = freshMetriclessLoop({ maxIterations: 0, timeLimitHours: 1 });
+  const t = applyMetriclessTick(byTime, "2026-07-20T02:00:00Z"); // 2h after start
+  assert.equal(t.kind, "stop");
+  assert.match(t.kind === "stop" ? t.reason : "", /time bound/);
+  const byTokens = freshMetriclessLoop({ maxIterations: 0, tokenBudget: 1000, tokensUsed: 1500 });
+  const tk = applyMetriclessTick(byTokens, "2026-07-20T00:30:00Z");
+  assert.equal(tk.kind, "stop");
+  assert.match(tk.kind === "stop" ? tk.reason : "", /token budget/);
+});
+
+test("applyMeasurement: max=0 = no iteration cap for measured loops either", () => {
+  const loop = freshLoop({ maxIterations: 0, plateauWindow: 100 });
+  for (let i = 0; i < 15; i++) {
+    const outcome = applyMeasurement(loop, 5, "2026-07-20T01:00:00Z");
+    assert.equal(outcome.kind, "continue");
+  }
+  assert.equal(loop.active, true);
 });

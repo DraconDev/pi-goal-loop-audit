@@ -61,9 +61,20 @@ matches `/list show`.
 /loop start "reduce TODOs" measure="grep -c TODO src.txt | head -1" direction=min
 /loop start "shrink the bundle" measure="..." direction=min time=4 tokens=500000   # arbitrary bounds
 /loop start "reduce TODOs" measure="..." direction=min branch=1   # scratch-branch mode
+/loop start "keep improving SPEC.md" measure=none max=20   # metricless spec loop (v0.23.0)
 /loop status                       # iteration, best, stall, recent values
 /loop stop                         # halt with summary
 ```
+
+**Metricless loops** (`measure=none`): for genuinely endless work — an
+ever-improving spec, continuous hardening — where no number means "better".
+There is **no plateau stop** (nothing to stall on): the loop ends only at
+its bounds (`max` iterations — `max=0` is truly unbounded — `time` hours,
+`tokens` budget) or `/loop stop`. Every iteration must make one real,
+inspectable change; cosmetic churn is the known failure mode
+(doorknob-polishing). The drafter offers this when you say there is no
+number, and tells you the trade-off before you confirm. Work with a finish
+line is still a `/goal`.
 
 Subcommands match **exactly** — `/goal pause the pipeline` sets an objective
 about a pipeline; only bare `/goal pause` pauses. (Same rule everywhere, so

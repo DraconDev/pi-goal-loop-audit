@@ -81,10 +81,14 @@ export interface AuditDisplayProgress {
 export function buildStatusText(state: State, audit?: AuditDisplayProgress | null, now = Date.now(), theme?: DisplayTheme): string | undefined {
   if (state.loop?.active) {
     const l = state.loop;
+    // v0.23.0: metricless spec loop — no arrow/best/stall, no plateau.
+    if (!l.measureCmd) {
+      return `glla: loop ${paint(theme, "accent", "∞")} iter ${l.iteration}${l.maxIterations > 0 ? `/${l.maxIterations}` : ""} · metricless`;
+    }
     const arrow = paint(theme, "accent", l.direction === "min" ? "↓" : "↑");
     const stallText = `stall ${l.stallCount}/${l.plateauWindow}`;
     const stall = l.stallCount >= l.plateauWindow - 1 ? paint(theme, "warning", stallText) : stallText;
-    return `glla: loop ${arrow} iter ${l.iteration}/${l.maxIterations} · best ${l.bestValue ?? "n/a"} · ${stall}`;
+    return `glla: loop ${arrow} iter ${l.iteration}/${l.maxIterations > 0 ? l.maxIterations : "∞"} · best ${l.bestValue ?? "n/a"} · ${stall}`;
   }
   const g = state.goal;
   if (!g) return undefined;
