@@ -5,13 +5,11 @@
  * Isolated completion auditor. Runs in a fresh pi agent session with no
  * extensions, no skills, no prompts, no themes, no editor. Only read tools.
  *
- * In v0.1.0 the auditor behaves the same as pi-goal-x's auditor: it must
- * call at least one read tool before <approved/>.
- *
- * In v0.2.0 (NOT YET IMPLEMENTED) we will add regression_shield: the
- * auditor's report must include raw output (cat / grep / bash) for every
- * must-verify item in the verification contract. The orchestrator will
- * reject <approved/> without that evidence.
+ * Two enforced floors: the auditor must call at least one read tool before
+ * <approved/>, and regression_shield (goal-loop-shield.ts) requires the
+ * report to include raw output (cat / grep / bash) for every must-verify
+ * item in the verification contract — the orchestrator rejects
+ * evidence-free approvals.
  */
 
 import type { Model } from "@earendil-works/pi-ai";

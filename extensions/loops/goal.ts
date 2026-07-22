@@ -1537,7 +1537,6 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       const goal = createGoal(full, liveCtx);
       setGoal(goal, liveCtx);
       iterationCounter = 0;
-      consecutiveStuckIterations = 0;
       consecutiveErrorIterations = 0;
       scheduleContinuation(liveCtx, true);
       return {
