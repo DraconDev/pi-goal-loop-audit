@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.22.6] — 2026-07-22
+
+### Fixed
+
+- **Regression shield false-rejected genuine approvals.** Three real
+  `<approved/>` audits (hegemon) were converted to disapprovals because the
+  per-item check demanded the item's single longest word verbatim: contract-
+  only vocabulary ("left-cropped"), prose-glued punctuation
+  ("file/element."), and slash-compounds ("Phaser/Svelte") never appear in a
+  good-faith report. Matching is now: top-3 longest tokens (>=5 chars, edge
+  punctuation stripped), ANY-match; compound tokens match via their
+  segments. Verified against the actual hegemon reports — the misread items
+  now pass; bamboozle-style reports still fail (5 new tests).
+- **"Out of scope:" contract lines no longer require evidence.** Boundary
+  statements constrain the auditor's judgment; they are not deliverables.
+- **Shield-blocked approvals are no longer reported as plain disapprovals.**
+  The tool result now says the auditor APPROVED, lists the unreferenced
+  contract items, and tells the executor not to touch the deliverable — the
+  old generic message read like a verdict (an executor concluded "parser
+  bug" and gave up with a complete deliverable).
+- **Shield gaps feed the next audit.** The missing contract items are
+  recorded in auditHistory (regressionShieldMissing) and injected into the
+  next auditor prompt ("address each of them explicitly: name the item and
+  paste the raw output"), so a retried audit converges instead of repeating
+  the same vocabulary gap.
+- **List-draft Confirm dialog names immediate activation.** A drafted list
+  item auto-activates when the list is empty, but the dialog only said
+  "Confirm goal" — "I started a list and ended up with a running goal" was
+  a real surprise. The dialog is now titled "Confirm list item" and states
+  up front: "List is empty — confirming ACTIVATES this immediately as the
+  active goal. Reject if you only wanted to queue it." Batch drafts get the
+  same note.
+
 ## [0.22.5] — 2026-07-22
 
 ### Added
