@@ -578,3 +578,16 @@ export function buildTaskSummary(tasks: Task[]): string {
 export function cloneGoal(goal: Goal): Goal {
   return JSON.parse(JSON.stringify(goal));
 }
+
+/**
+ * Session-restore gate (v0.21.0): a session that carries conversation
+ * history ("resume" | "reload" | "fork") IS the goal's own context —
+ * auto-resuming work there is natural. A fresh session ("startup" | "new",
+ * or an older pi that reports no reason) has no context — restored state
+ * HOLDS until an explicit /goal resume (or /glla autoresume=on, the rig
+ * setting for unattended restarts). One mechanical predicate; no heuristics.
+ */
+export function shouldAutoResumeOnSessionStart(reason: string | undefined, autoResume: boolean | undefined): boolean {
+  if (autoResume === true) return true;
+  return reason === "resume" || reason === "reload" || reason === "fork";
+}

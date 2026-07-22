@@ -1843,6 +1843,9 @@ interface Settings {
   notifyCmd?: string;
   /** Per-goal token budget; crossing it pauses the goal. Default 1,000,000. */
   tokenLimit?: number;
+  /** on → restored goals/loops/lists auto-resume even in fresh sessions
+   * (unattended rigs). Default off: restore holds until /goal resume. */
+  autoResume?: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -1887,7 +1890,7 @@ function settingsProvenance(cwd: string): Record<keyof Settings, { value: unknow
   const glob = readSettingsFile(globalSettingsPath());
   const effective = loadSettings(cwd);
   const out: Record<string, { value: unknown; source: "project" | "global" | "default" }> = {};
-  const keys: Array<keyof Settings> = ["auditorModel", "auditorThinkingLevel", "notifyCmd", "tokenLimit"];
+  const keys: Array<keyof Settings> = ["auditorModel", "auditorThinkingLevel", "notifyCmd", "tokenLimit", "autoResume"];
   for (const k of keys) {
     if ((proj as Record<string, unknown>)[k] !== undefined) out[k] = { value: (proj as any)[k], source: "project" };
     else if ((glob as Record<string, unknown>)[k] !== undefined) out[k] = { value: (glob as any)[k], source: "global" };
@@ -2046,6 +2049,7 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
         fmt("auditorThinkingLevel", "thinking"),
         fmt("notifyCmd", "notify"),
         fmt("tokenLimit", "tokenLimit"),
+        fmt("autoResume", "autoResume"),
         `\nglobal:  ${globalSettingsPath()}`,
         `project: ${projectSettingsPath(ctx.cwd)}`,
         `Set with: /glla key=value (global) · /glla project key=value (project override)`,
@@ -2084,6 +2088,16 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
       } else {
         ctx.ui.notify(`tokenlimit must be a positive integer, got: ${value}`, "warning");
       }
+    } else if (key === "autoresume") {
+      if (["on", "true", "1", "yes"].includes(value)) {
+        patch.autoResume = true;
+        changed = true;
+      } else if (["off", "false", "0", "no", "unset"].includes(value)) {
+        patch.autoResume = undefined;
+        changed = true;
+      } else {
+        ctx.ui.notify(`autoresume must be on or off, got: ${value}`, "warning");
+      }
     } else if (key === "thinking" || key === "auditorthinkinglevel") {
       if (["off", "minimal", "low", "medium", "high", "xhigh"].includes(value)) {
         patch.auditorThinkingLevel = value as Settings["auditorThinkingLevel"];
@@ -2094,13 +2108,13 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
     }
   }
   if (!changed) {
-    ctx.ui.notify("Nothing changed. Use key=value (model, thinking, notify, tokenlimit), optionally prefixed with 'project'.", "info");
+    ctx.ui.notify("Nothing changed. Use key=value (model, thinking, notify, tokenlimit, autoresume), optionally prefixed with 'project'.", "info");
     return;
   }
   saveSettings(scope, ctx.cwd, patch);
   const effective = loadSettings(ctx.cwd);
   ctx.ui.notify(
-    `Saved to ${scope} config. Effective now: model=${effective.auditorModel ?? "(session model)"} thinking=${effective.auditorThinkingLevel ?? "(session)"} notify=${effective.notifyCmd ?? "(off)"} tokenLimit=${effective.tokenLimit ?? 0}${(effective.tokenLimit ?? 0) > 0 ? "" : " (off)"}\n` +
+    `Saved to ${scope} config. Effective now: model=${effective.auditorModel ?? "(session model)"} thinking=${effective.auditorThinkingLevel ?? "(session)"} notify=${effective.notifyCmd ?? "(off)"} tokenLimit=${effective.tokenLimit ?? 0}${(effective.tokenLimit ?? 0) > 0 ? "" : " (off)"} autoResume=${effective.autoResume === true ? "on" : "off"}\n` +
     `Note: the auditor runs without extensions — it must be a built-in provider, not an extension-registered one.`,
     "info",
   );
