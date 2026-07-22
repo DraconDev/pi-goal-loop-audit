@@ -4,6 +4,9 @@
  *
  * Pure display builders for the live TUI (status line + above-editor widget).
  * No pi imports — unit tests exercise these directly. The orchestrator calls
+ * No RUNTIME imports at all: tests run under `node --experimental-strip-types`,
+ * which does not rewrite `.js` → `.ts` specifiers — a value import from
+ * ./goal-loop-core.js breaks the suite (type-only imports are erased, safe).
  * ctx.ui.setStatus/setWidget with whatever these return.
  */
 
