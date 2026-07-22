@@ -28,6 +28,7 @@ import {
   readState,
   mergeSettings,
   renderGoalMarkdown,
+  shouldAutoResumeOnSessionStart,
   statusLabel,
   sumNewAssistantTokens,
   DEFAULT_TOKEN_LIMIT,
@@ -317,4 +318,26 @@ test("piGlaDir migrates a legacy .pi-gla dir exactly once (v0.17.0)", () => {
   piGlaDir(cwd);
   assert.ok(fs.existsSync(path.join(cwd, ".pi-gla")), "legacy untouched when new exists");
   fs.rmSync(cwd, { recursive: true, force: true });
+});
+
+// ---- session-restore gate (v0.21.0) ----
+
+test("restore gate: sessions with history auto-resume", () => {
+  for (const reason of ["resume", "reload", "fork"]) {
+    assert.equal(shouldAutoResumeOnSessionStart(reason, undefined), true, reason);
+  }
+});
+
+test("restore gate: fresh sessions hold by default", () => {
+  for (const reason of ["startup", "new"]) {
+    assert.equal(shouldAutoResumeOnSessionStart(reason, undefined), false, reason);
+  }
+  // Older pi builds report no reason → hold (safe direction: no surprise work).
+  assert.equal(shouldAutoResumeOnSessionStart(undefined, undefined), false);
+});
+
+test("restore gate: autoresume=on overrides any reason", () => {
+  for (const reason of ["startup", "new", "resume", "reload", "fork", undefined]) {
+    assert.equal(shouldAutoResumeOnSessionStart(reason, true), true, String(reason));
+  }
 });
