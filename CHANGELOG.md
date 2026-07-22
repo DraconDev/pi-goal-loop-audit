@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.22.7] — 2026-07-22
+
+### Added
+
+- **`/list resume`** — resume the paused list item without leaving the
+  list surface. The head item activates AS the active goal, so this is the
+  same motion as `/goal resume`, named for what the user is looking at
+  ("we would just unpause, and that is next"). Errors clearly when nothing
+  is paused or the paused goal didn't come from the list. Autocomplete
+  included.
+
+### Fixed
+
+- **Pause/resume/restore messaging names the thing you're resuming.** A
+  paused list item said "Goal paused — /goal resume to continue", which
+  read wrong when you were managing a list. Now: `/list pause` path says
+  "List item … paused (N queued in the list). /list resume to continue.";
+  resume confirms "Resumed list item [id]"; the fresh-session restore gate
+  holds a list head with "List item held on restore … /list resume to
+  continue"; auto-resume and autoContinue-off restore notices say
+  "list item" too. Loops already had their own text ("/loop to resume").
+- **Paused footer shows the policy word.** `glla: list paused ⏸ …` /
+  `glla: goal paused ⏸ …`, mirroring the active line's `list ●` / `goal ●`.
+
 ## [0.22.6] — 2026-07-22
 
 ### Fixed
