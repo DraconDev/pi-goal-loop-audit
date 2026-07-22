@@ -144,8 +144,11 @@ function refreshUI(ctx: ExtensionContext): void {
   if (!ctx.hasUI) return;
   try {
     const theme = ctx.ui.theme as unknown as import("../goal-loop-display.js").DisplayTheme | undefined;
+    // Terminal width for truncation budgets: on wide terminals the widget
+    // uses the room instead of cutting at fixed ~60-char floors.
+    const width = process.stdout.columns || 80;
     ctx.ui.setStatus("pi-glla", buildStatusText(state, latestAuditProgress, Date.now(), theme));
-    ctx.ui.setWidget("pi-glla", buildWidgetLines(state, latestAuditProgress, Date.now(), theme));
+    ctx.ui.setWidget("pi-glla", buildWidgetLines(state, latestAuditProgress, Date.now(), theme, width));
   } catch {
     // stale ctx — next event refreshes
   }

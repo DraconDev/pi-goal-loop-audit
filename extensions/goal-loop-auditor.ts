@@ -208,7 +208,15 @@ export async function runGoalCompletionAuditor(args: {
       cwd: ctx.cwd,
       model,
       thinkingLevel,
-      modelRegistry: ctx.modelRegistry,
+      // Pass the PARENT's ModelRuntime (v0.22.2). createAgentSession has no
+      // "modelRegistry" option — passing the facade was silently ignored and
+      // a FRESH runtime was built from auth.json/models.json, which has no
+      // extension-registered providers. Streaming a model from such a
+      // provider (e.g. one with a custom streamSimple wrapper) then failed
+      // inside the stream and the auditor produced zero output. The facade
+      // keeps the runtime in a TS-private field; reach it defensively and
+      // fall back to the default (fresh runtime) if pi ever reshapes it.
+      modelRuntime: (ctx.modelRegistry as any)?.runtime,
       resourceLoader: makeAuditorResourceLoader(),
       sessionManager: SessionManager.inMemory(ctx.cwd),
       // Compaction ENABLED (v0.4.0, closes pi-goal-x flaw #3: context exhaustion
@@ -256,6 +264,13 @@ export async function runGoalCompletionAuditor(args: {
       if (event.type === "message_end") {
         const message = event.message as any;
         if (message?.role !== "assistant") return;
+        // Stream failures surface as an assistant message with stopReason
+        // "error" + errorMessage — NOT as an "error" event (v0.22.2: this
+        // is why "unknown provider"/driver failures looked like a silent
+        // empty report).
+        if (message.stopReason === "error" && typeof message.errorMessage === "string" && message.errorMessage.trim()) {
+          streamError = message.errorMessage.slice(0, 300);
+        }
         for (const part of message.content ?? []) {
           if (part.type === "text" && typeof part.text === "string") outputParts.push(part.text);
         }

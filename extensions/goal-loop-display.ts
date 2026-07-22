@@ -37,6 +37,18 @@ export function truncate(s: string, max: number): string {
   return s.length <= max ? s : s.slice(0, Math.max(0, max - 1)) + "…";
 }
 
+/**
+ * Width-aware truncation budget (v0.22.2). The hardcoded caps are FLOORS for
+ * narrow terminals; when the terminal is wider, lines may use the available
+ * width instead of being cut at a fixed ~60 chars (pi-tasks truncates at
+ * tui.terminal.columns — match that behavior). `prefixCols` is the visible
+ * width of the static prefix on the line (branch glyph + pi's 1-col gutter).
+ */
+function budgetFor(width: number | undefined, prefixCols: number, floor: number): number {
+  if (!width || width <= 0) return floor;
+  return Math.max(floor, width - 1 - prefixCols);
+}
+
 function sinceIso(iso: string): number {
   const t = Date.parse(iso);
   return Number.isFinite(t) ? Date.now() - t : 0;
@@ -122,17 +134,17 @@ function countTotal(g: Goal): number {
  * Widget lines for ctx.ui.setWidget("pi-glla", lines).
  * Returns undefined when nothing is worth showing.
  */
-export function buildWidgetLines(state: State, audit?: AuditDisplayProgress | null, now = Date.now(), theme?: DisplayTheme): string[] | undefined {
-  if (state.loop?.active) return loopLines(state.loop, now, theme);
+export function buildWidgetLines(state: State, audit?: AuditDisplayProgress | null, now = Date.now(), theme?: DisplayTheme, width?: number): string[] | undefined {
+  if (state.loop?.active) return loopLines(state.loop, now, theme, width);
   const g = state.goal;
   if (!g) return undefined;
   if (g.status === "complete" || g.status === "aborted") return undefined;
-  return goalLines(g, state, audit, now, theme);
+  return goalLines(g, state, audit, now, theme, width);
 }
 
 // Branch lines sit flush-left (pi-tasks convention): pi's widget renderer
 // adds its own one-space gutter, so any indent here doubles up.
-function goalLines(g: Goal, state: State, audit: AuditDisplayProgress | null | undefined, now: number, theme?: DisplayTheme): string[] {
+function goalLines(g: Goal, state: State, audit: AuditDisplayProgress | null | undefined, now: number, theme?: DisplayTheme, width?: number): string[] {
   // Head glyph is ● (not ◆): U+25C6 renders as a color-emoji diamond in some
   // terminal fonts and ignores ANSI color; ● takes the paint everywhere.
   const icon =
@@ -141,7 +153,7 @@ function goalLines(g: Goal, state: State, audit: AuditDisplayProgress | null | u
       : g.status === "auditing"
         ? paint(theme, "accent", "⟡")
         : paint(theme, "success", "●");
-  const head = `${icon} ${truncate(g.objective.replace(/\s+/g, " "), 64)}`;
+  const head = `${icon} ${truncate(g.objective.replace(/\s+/g, " "), budgetFor(width, 3, 64))}`;
   const statusWord = g.status === "active" ? paint(theme, "success", "active") : g.status;
   // Token segment only when a budget is set (v0.22.0): the guard is opt-in,
   // and "0/0 tok" carried no information when off.
@@ -155,29 +167,29 @@ function goalLines(g: Goal, state: State, audit: AuditDisplayProgress | null | u
     return lines;
   }
   if (g.status === "paused" && g.pauseReason) {
-    lines.push(`├─ ${paint(theme, pauseIsError(g) ? "error" : "warning", truncate(g.pauseReason, 60))}`);
-    if (g.pauseSuggestedAction) lines.push(`└─ ${paint(theme, "dim", truncate(g.pauseSuggestedAction, 60))}`);
+    lines.push(`├─ ${paint(theme, pauseIsError(g) ? "error" : "warning", truncate(g.pauseReason, budgetFor(width, 3, 60)))}`);
+    if (g.pauseSuggestedAction) lines.push(`└─ ${paint(theme, "dim", truncate(g.pauseSuggestedAction, budgetFor(width, 3, 60)))}`);
     return lines;
   }
   const next = nextPending(g);
-  if (next) lines.push(`├─ next: ${truncate(next, 56)}`);
+  if (next) lines.push(`├─ next: ${truncate(next, budgetFor(width, 9, 56))}`);
   const queue = state.list?.length ?? 0;
   lines.push(`└─ ${paint(theme, "dim", `${queue > 0 ? `list ${queue} · ` : ""}/goal status · /glla`)}`);
   return lines;
 }
 
-function loopLines(l: LoopState, now: number, theme?: DisplayTheme): string[] {
+function loopLines(l: LoopState, now: number, theme?: DisplayTheme, width?: number): string[] {
   const arrow = paint(theme, "accent", l.direction === "min" ? "↓" : "↑");
   const best = paint(theme, "success", `${l.bestValue ?? "n/a"}`);
   const stallText = `stall ${l.stallCount}/${l.plateauWindow}`;
   const stall = l.stallCount >= l.plateauWindow - 1 ? paint(theme, "warning", stallText) : stallText;
   const lines = [
-    `${paint(theme, "accent", "●")} ${truncate(l.target, 64)}`,
+    `${paint(theme, "accent", "●")} ${truncate(l.target, budgetFor(width, 3, 64))}`,
     `├─ loop ${arrow} iter ${l.iteration}/${l.maxIterations} · ${fmtElapsed(now - Date.parse(l.startedAt))}`,
     `├─ best ${best} · last ${l.lastValue ?? "n/a"} · ${stall}`,
-    `└─ ${paint(theme, "dim", truncate(l.measureCmd, 56))}`,
+    `└─ ${paint(theme, "dim", truncate(l.measureCmd, budgetFor(width, 3, 56)))}`,
   ];
-  if (l.branchName) lines.push(`⎇ ${paint(theme, "muted", truncate(l.branchName, 50))}`);
+  if (l.branchName) lines.push(`⎇ ${paint(theme, "muted", truncate(l.branchName, budgetFor(width, 3, 50)))}`);
   return lines;
 }
 
