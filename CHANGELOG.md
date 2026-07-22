@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.22.0] — 2026-07-22
+
+Self-audit release: the extension audited itself (goal 20260722151428-375it3,
+report in the operator's audit dir) and shipped every fix in one batch.
+
+### Changed (approved behavior fixes)
+
+- **Widget token segment is conditional.** With the token guard off (the
+  default, opt-in since v0.12.0) the widget showed "0/0 tok" — zero
+  information. The "· N/M tok" segment now appears only when a budget is set.
+- **Provider warning reworded.** The session-start notice claimed an
+  extension-registered session provider means "the auditor will fail auth".
+  False for providers defined in ~/.pi/agent/models.json: the auditor inherits
+  the already-resolved Model object in-process, so those work. The notice is
+  now failure-conditional: "if audits error with auth/provider failures, set
+  /glla model=provider/id".
+
+### Fixed (hygiene batch from the audit)
+
+- INSTALL.md listed the v0.1.0-era /pi-gla-* command family — a fresh install
+  following the doc could invoke nothing. Now /goal, /list, /loop, /glla, and
+  the smoke walkthrough uses /goal start.
+- docs/DESIGN.md, PLAN.md, README.md, examples/, schemas/goal.schema.json:
+  swept the last /pi-gla-* command names, .pi-gla/ paths, pi-gla-loop/ branch
+  prefix, the "default 1M" token claim, and the "Stuck > 5 min" mechanism
+  (the live guard is the 3-turn stall watchdog). PLAN.md's header no longer
+  claims "v0.1.0-alpha.1 scaffold"; examples/example-objective.md rewritten
+  to current behavior including the v0.21.0 restore hold.
+- prompts/goal-loop-continuation.md told the model to propose a
+  /pi-gla-tweak (nonexistent) → /goal tweak; its BACKOFF section described a
+  5-minute pause that was never live → STALLS section matching the real
+  watchdog.
+- Dead code: removed unused backoff imports, STATE_ENTRY, and
+  consecutiveStuckIterations from loops/goal.ts; /loop usage text no longer
+  advertises the removed done= key; goal-loop-auditor.ts header no longer
+  says regression_shield is "NOT YET IMPLEMENTED" (it has been live since
+  v0.2.0); list_status tool label "Queue status" → "List status".
+- Test docs: counts unified to the measured 168 across 12 files;
+  tests/README.md coverage list gained the 5 missing files.
+- CHANGELOG: removed a duplicated 0.19.0 heading.
+- goal-loop-display.ts header now documents the purity rule: no runtime
+  imports (npm test runs node --experimental-strip-types, which does not
+  rewrite .js → .ts specifiers).
+
 ## [0.21.1] — 2026-07-22
 
 ### Fixed — widget head glyph and tree alignment
