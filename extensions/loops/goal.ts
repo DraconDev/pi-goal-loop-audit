@@ -1823,7 +1823,7 @@ interface Settings {
 const DEFAULT_SETTINGS: Settings = {
   // Unset = follow the pi session thinking level (user selects thinking in
   // pi, auditor follows), floor "high" — the auditor is the verification
-  // gate, depth is worth more there than speed. /gla thinking= overrides.
+  // gate, depth is worth more there than speed. /glla thinking= overrides.
   auditorThinkingLevel: undefined,
 };
 
@@ -1856,7 +1856,7 @@ function loadSettings(cwd: string): Settings {
   ) as unknown as Settings;
 }
 
-/** Where each effective setting comes from (for the /gla display). */
+/** Where each effective setting comes from (for the /glla display). */
 function settingsProvenance(cwd: string): Record<keyof Settings, { value: unknown; source: "project" | "global" | "default" }> {
   const proj = readSettingsFile(projectSettingsPath(cwd));
   const glob = readSettingsFile(globalSettingsPath());
@@ -1905,7 +1905,7 @@ function getSessionThinkingLevel(): "off" | "minimal" | "low" | "medium" | "high
  * model in pi; the auditor uses it.** The plugin never picks a model itself.
  *
  * Chain:
- *   1. Explicit `/gla model=provider/id` override (rare).
+ *   1. Explicit `/glla model=provider/id` override (rare).
  *   2. The pi session model (ctx.model) — whatever the user selected.
  *
  * If the session model's provider is extension-registered, the auditor's
