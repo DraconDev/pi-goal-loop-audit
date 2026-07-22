@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.15.1] — 2026-07-22
+
+### Fixed — endless drafting: the gate ignored dialog answers
+
+Wild failure (junk-runner session): the user answered **five**
+`ask_user_question` rounds and `propose_goal_draft` still returned
+INTERVIEW FIRST every time. The floor counted only typed chat messages
+(`message_start` role=user); dialog answers arrive as **tool results** and
+never incremented the counter. Worse, the blocked error said "ask one sharp
+question, then propose again" — mechanically manufacturing an endless
+interview. The agent eventually bypassed the goal entirely.
+
+Two fixes, one mechanism:
+
+- `tool_result` handler counts answered `ask_user_question` questionnaires
+  (`details.cancelled === false` with ≥1 answer — Esc-abandons do NOT count)
+  toward the interview floor, via the new `askUserQuestionAnswered` helper.
+- Stuck-gate escape hatch: after 3 blocked proposals, the error message
+  switches to "tell the user to type any chat message to unlock" — a gate
+  that cannot see the replies must never manufacture another interview round.
+
+## [0.15.0] — 2026-07-21
+
 ## [0.15.0] — 2026-07-21
 
 ### The package is now `pi-goal-list-loop-audit` — and a loop never completes

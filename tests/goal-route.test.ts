@@ -8,7 +8,7 @@
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
 
-import { buildSeedGrillMessage, draftProposalBlock, goalArgsNeedDrafting, routeGoalArgs } from "../extensions/goal-loop-core.ts";
+import { askUserQuestionAnswered, buildSeedGrillMessage, draftProposalBlock, goalArgsNeedDrafting, routeGoalArgs } from "../extensions/goal-loop-core.ts";
 
 test("empty args → draft", () => {
   assert.deepEqual(routeGoalArgs(""), { kind: "draft" });
