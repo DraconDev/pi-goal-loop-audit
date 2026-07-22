@@ -127,34 +127,36 @@ export function buildWidgetLines(state: State, audit?: AuditDisplayProgress | nu
   return goalLines(g, state, audit, now, theme);
 }
 
-// Branch lines indent one space (pi-tasks convention): the tree sits under
-// the head glyph, text column consistent across widgets.
+// Branch lines sit flush-left (pi-tasks convention): pi's widget renderer
+// adds its own one-space gutter, so any indent here doubles up.
 function goalLines(g: Goal, state: State, audit: AuditDisplayProgress | null | undefined, now: number, theme?: DisplayTheme): string[] {
+  // Head glyph is ● (not ◆): U+25C6 renders as a color-emoji diamond in some
+  // terminal fonts and ignores ANSI color; ● takes the paint everywhere.
   const icon =
     g.status === "paused"
       ? paint(theme, pauseIsError(g) ? "error" : "warning", "⏸")
       : g.status === "auditing"
         ? paint(theme, "accent", "⟡")
-        : paint(theme, "success", "◆");
+        : paint(theme, "success", "●");
   const head = `${icon} ${truncate(g.objective.replace(/\s+/g, " "), 64)}`;
   const statusWord = g.status === "active" ? paint(theme, "success", "active") : g.status;
   const tokens = paint(theme, "dim", `${fmtTokens(g.usage?.tokensUsed ?? 0)}/${fmtTokens(g.usage?.tokensLimit ?? 10_000_000)} tok`);
-  const lines = [head, ` ├─ ${statusWord} · ${fmtElapsed(now - Date.parse(g.createdAt))} · ${tokens}`];
+  const lines = [head, `├─ ${statusWord} · ${fmtElapsed(now - Date.parse(g.createdAt))} · ${tokens}`];
   if (g.status === "auditing") {
-    lines.push(` ├─ auditor: ${audit?.label ?? "running"}${audit?.currentTool ? ` · ${truncate(audit.currentTool, 30)}` : ""}`);
-    if (audit?.elapsedMs) lines.push(` └─ ${paint(theme, "dim", `${fmtElapsed(audit.elapsedMs)} in isolated session`)}`);
-    else lines.push(` └─ ${paint(theme, "dim", "isolated session, read-only tools")}`);
+    lines.push(`├─ auditor: ${audit?.label ?? "running"}${audit?.currentTool ? ` · ${truncate(audit.currentTool, 30)}` : ""}`);
+    if (audit?.elapsedMs) lines.push(`└─ ${paint(theme, "dim", `${fmtElapsed(audit.elapsedMs)} in isolated session`)}`);
+    else lines.push(`└─ ${paint(theme, "dim", "isolated session, read-only tools")}`);
     return lines;
   }
   if (g.status === "paused" && g.pauseReason) {
-    lines.push(` ├─ ${paint(theme, pauseIsError(g) ? "error" : "warning", truncate(g.pauseReason, 60))}`);
-    if (g.pauseSuggestedAction) lines.push(` └─ ${paint(theme, "dim", truncate(g.pauseSuggestedAction, 60))}`);
+    lines.push(`├─ ${paint(theme, pauseIsError(g) ? "error" : "warning", truncate(g.pauseReason, 60))}`);
+    if (g.pauseSuggestedAction) lines.push(`└─ ${paint(theme, "dim", truncate(g.pauseSuggestedAction, 60))}`);
     return lines;
   }
   const next = nextPending(g);
-  if (next) lines.push(` ├─ next: ${truncate(next, 56)}`);
+  if (next) lines.push(`├─ next: ${truncate(next, 56)}`);
   const queue = state.list?.length ?? 0;
-  lines.push(` └─ ${paint(theme, "dim", `${queue > 0 ? `list ${queue} · ` : ""}/goal status · /glla`)}`);
+  lines.push(`└─ ${paint(theme, "dim", `${queue > 0 ? `list ${queue} · ` : ""}/goal status · /glla`)}`);
   return lines;
 }
 
@@ -164,12 +166,12 @@ function loopLines(l: LoopState, now: number, theme?: DisplayTheme): string[] {
   const stallText = `stall ${l.stallCount}/${l.plateauWindow}`;
   const stall = l.stallCount >= l.plateauWindow - 1 ? paint(theme, "warning", stallText) : stallText;
   const lines = [
-    `${paint(theme, "accent", "◆")} ${truncate(l.target, 64)}`,
-    ` ├─ loop ${arrow} iter ${l.iteration}/${l.maxIterations} · ${fmtElapsed(now - Date.parse(l.startedAt))}`,
-    ` ├─ best ${best} · last ${l.lastValue ?? "n/a"} · ${stall}`,
-    ` └─ ${paint(theme, "dim", truncate(l.measureCmd, 56))}`,
+    `${paint(theme, "accent", "●")} ${truncate(l.target, 64)}`,
+    `├─ loop ${arrow} iter ${l.iteration}/${l.maxIterations} · ${fmtElapsed(now - Date.parse(l.startedAt))}`,
+    `├─ best ${best} · last ${l.lastValue ?? "n/a"} · ${stall}`,
+    `└─ ${paint(theme, "dim", truncate(l.measureCmd, 56))}`,
   ];
-  if (l.branchName) lines.push(`  ⎇ ${paint(theme, "muted", truncate(l.branchName, 50))}`);
+  if (l.branchName) lines.push(`⎇ ${paint(theme, "muted", truncate(l.branchName, 50))}`);
   return lines;
 }
 

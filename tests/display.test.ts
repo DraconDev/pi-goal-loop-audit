@@ -131,7 +131,7 @@ test("widget: nothing supervised → undefined", () => {
 
 test("widget: goal lines include objective, status, tokens, footer", () => {
   const lines = buildWidgetLines({ goal: goalOf(), list: [] }, null, NOW)!;
-  assert.match(lines[0]!, /◆ Create x\.txt containing ok/);
+  assert.match(lines[0]!, /● Create x.txt containing ok/);
   assert.ok(lines.some((l) => l.includes("12.4k/1000k tok")));
   assert.ok(lines.some((l) => l.includes("/goal status")));
 });
