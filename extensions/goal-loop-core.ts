@@ -202,6 +202,35 @@ export function parseListImport(content: string): string[] {
 }
 
 /**
+ * Route natural-language text handed to `/list` with no subcommand verb
+ * (v0.18.0). The user typed a dump — "fix x, do y, write docs" — not a
+ * command. Flexible by detection, never a usage error:
+ *   file path        → bulk import (sisyphus/Ralph plan file)
+ *   multi-line paste → batch add (structure is already explicit)
+ *   has "Done when:" → one direct item (explicit contract)
+ *   anything else    → conversational decomposition (drafting session;
+ *                      the agent shapes it into items[], one Confirm)
+ * The explicit verb `/list add` stays the direct escape hatch (symmetric
+ * with `/goal start`): it skips the draft branch.
+ */
+export type ListTextRoute =
+  | { kind: "file"; path: string }
+  | { kind: "batch"; items: string[] }
+  | { kind: "direct"; text: string }
+  | { kind: "draft"; seed: string };
+
+export function routeListText(cwd: string, raw: string): ListTextRoute {
+  const importFile = resolveImportFile(cwd, raw);
+  if (importFile) return { kind: "file", path: importFile };
+  if (raw.includes("\n")) {
+    const pasted = parseListImport(raw);
+    if (pasted.length > 1) return { kind: "batch", items: pasted };
+  }
+  if (!goalArgsNeedDrafting(raw)) return { kind: "direct", text: raw };
+  return { kind: "draft", seed: raw };
+}
+
+/**
  * Detect whether a `/list add` argument is a readable file (v0.8.2). File
  * detection, not a separate verb: `/list add plan.md` bulk-imports when the
  * path exists, and is an objective when it doesn't. Returns the absolute

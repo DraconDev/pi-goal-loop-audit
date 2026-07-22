@@ -759,8 +759,9 @@ async function cmdList(args: string, ctx: ExtensionContext): Promise<void> {
       await startDrafting(ctx, "list");
       return;
     }
-    // Flexible by detection, not by verb: an existing file path bulk-imports,
-    // multi-line pasted text parses as a batch, anything else is one objective.
+    // Explicit verb = explicit intent (the /goal start of lists): file and
+    // multi-line structure are still honored, but vague text adds AS ONE
+    // ITEM — no interview. The conversational path is bare /list <text>.
     const importFile = resolveImportFile(ctx.cwd, raw);
     if (importFile) {
       await bulkAddFromFile(ctx, importFile);
@@ -773,17 +774,7 @@ async function cmdList(args: string, ctx: ExtensionContext): Promise<void> {
         return;
       }
     }
-    const { objective, verificationContract } = extractVerificationContract(raw);
-    const item = { id: newGoalId(), objective, verificationContract: verificationContract || undefined, addedAt: nowIso() };
-    state = { ...state, list: [...listQueue(), item] };
-    persistState(ctx);
-    appendLedger(ctx.cwd, "list_added", { id: item.id, objective: item.objective });
-    // Nothing active → activate immediately.
-    if (!state.goal || state.goal.status === "complete" || state.goal.status === "aborted") {
-      activateNextListItem(ctx);
-    } else {
-      ctx.ui.notify(`Queued (${listQueue().length} waiting): ${objective.slice(0, 80)}`, "info");
-    }
+    addSingleItem(ctx, raw);
     return;
   }
 
@@ -828,7 +819,44 @@ async function cmdList(args: string, ctx: ExtensionContext): Promise<void> {
     return;
   }
 
-  ctx.ui.notify("Usage: /list [show] | /list add <objective or file> | /list next | /list remove <n> | /list clear", "info");
+  // v0.18.0: an unknown first word isn't an error — it's a natural-language
+  // dump. "/list fix the login bug, add dark mode, write docs" should MAKE
+  // a list, not print usage. Detection chain: file → batch → contract →
+  // conversational decomposition (drafting). The explicit verb for adding
+  // one item verbatim is /list add.
+  let raw = args.trim();
+  if (raw.length >= 2 && ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'")))) {
+    raw = raw.slice(1, -1).trim();
+  }
+  const route = routeListText(ctx.cwd, raw);
+  if (route.kind === "file") {
+    await bulkAddFromFile(ctx, route.path);
+    return;
+  }
+  if (route.kind === "batch") {
+    await bulkAddItems(ctx, route.items, "pasted text");
+    return;
+  }
+  if (route.kind === "direct") {
+    addSingleItem(ctx, route.text);
+    return;
+  }
+  await startDrafting(ctx, "list", route.seed);
+}
+
+/** Append one objective to the list; activate immediately when idle. */
+function addSingleItem(ctx: ExtensionContext, raw: string): void {
+  const { objective, verificationContract } = extractVerificationContract(raw);
+  const item = { id: newGoalId(), objective, verificationContract: verificationContract || undefined, addedAt: nowIso() };
+  state = { ...state, list: [...listQueue(), item] };
+  persistState(ctx);
+  appendLedger(ctx.cwd, "list_added", { id: item.id, objective: item.objective });
+  // Nothing active → activate immediately.
+  if (!state.goal || state.goal.status === "complete" || state.goal.status === "aborted") {
+    activateNextListItem(ctx);
+  } else {
+    ctx.ui.notify(`Queued (${listQueue().length} waiting): ${objective.slice(0, 80)}`, "info");
+  }
 }
 
 /**
