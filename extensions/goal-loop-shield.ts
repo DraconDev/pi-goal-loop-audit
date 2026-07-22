@@ -20,7 +20,10 @@ export function contractItems(contract: string): string[] {
     .map((l) => l.trim())
     .map((l) => l.replace(/^(?:done when|verify|verified when|verification|done)\s*:\s*/i, ""))
     .map((l) => l.replace(/^[-*•]\s+/, "").replace(/^\d+[.)]\s+/, ""))
-    .filter((l) => l.length > 0);
+    .filter((l) => l.length > 0)
+    // Boundary lines ("Out of scope: ...") constrain the auditor's judgment;
+    // they are not deliverables and have no evidence to quote (v0.22.6).
+    .filter((l) => !/^out of scope\b/i.test(l));
 }
 
 export interface RegressionShieldResult {
@@ -29,14 +32,35 @@ export interface RegressionShieldResult {
   hasEvidenceBlock: boolean;
 }
 
+/** Strip prose punctuation glued to a token ("file/element." → "file/element"). */
+function stripEdgePunct(w: string): string {
+  return w.replace(/^[^A-Za-z0-9]+/, "").replace(/[^A-Za-z0-9/_.-]+$/, "");
+}
+
+/**
+ * Is a candidate token present in the report? Compound tokens joined by
+ * "-" or "/" (left-cropped, file/element, Phaser/Svelte) count as present
+ * when ALL their segments (len >= 3) appear — a good-faith report writes
+ * "no cropped strip on the left", not the contract's literal compound.
+ */
+function tokenPresent(candidate: string, reportLower: string): boolean {
+  const c = candidate.toLowerCase();
+  if (reportLower.includes(c)) return true;
+  const segments = c.split(/[-/]+/).filter((s) => s.length >= 3);
+  return segments.length > 1 && segments.every((s) => reportLower.includes(s));
+}
+
 /**
  * Check an approved auditor report against the verification contract.
  * Rules (deliberately simple + auditable):
  *   1. The report must contain an <evidence> ... </evidence> block.
- *   2. Every contract item must be referenced inside the report by a
- *      distinctive token (the item's longest word >= 5 chars, or the full
- *      item if shorter) — a cheap, honest proxy for "the auditor addressed
- *      this item".
+ *   2. Every contract item must be referenced inside the report by ANY of
+ *      its top-3 longest tokens (>= 5 chars, edge punctuation stripped;
+ *      compounds match via their segments). v0.22.6: the previous
+ *      single-longest-word rule false-rejected genuine approvals when the
+ *      longest word was contract-only vocabulary ("left-cropped") or had
+ *      prose punctuation glued on ("file/element.") — three real approved
+ *      audits on hegemon were converted to disapprovals that way.
  */
 export function checkRegressionShield(report: string, contract: string): RegressionShieldResult {
   const hasEvidenceBlock = /<evidence>[\t\n\r ]*[\s\S]*?<\/evidence>/i.test(report);
@@ -44,12 +68,16 @@ export function checkRegressionShield(report: string, contract: string): Regress
   const missingItems: string[] = [];
   const reportLower = report.toLowerCase();
   for (const item of items) {
-    // Distinctive token: longest word >= 5 chars in the item; fall back to the
-    // whole item (short items like "npm test" are matched whole).
-    const words = item.split(/[^A-Za-z0-9_.\-/]+/).filter(Boolean);
-    const distinctive = words.reduce((a, b) => (b.length >= 5 && b.length > a.length ? b : a), "");
-    const needle = (distinctive || item).toLowerCase();
-    if (!reportLower.includes(needle)) missingItems.push(item);
+    const candidates = item
+      .split(/[^A-Za-z0-9_.\-/]+/)
+      .map(stripEdgePunct)
+      .filter((w) => w.length >= 5)
+      .sort((a, b) => b.length - a.length)
+      .slice(0, 3);
+    const addressed = candidates.length > 0
+      ? candidates.some((c) => tokenPresent(c, reportLower))
+      : reportLower.includes(item.toLowerCase());
+    if (!addressed) missingItems.push(item);
   }
   return {
     passed: hasEvidenceBlock && missingItems.length === 0,

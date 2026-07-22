@@ -91,6 +91,11 @@ function makeAuditorResourceLoader(): ResourceLoader {
 
 function buildGoalAuditorPrompt(goal: Goal, completionSummary: string | null | undefined, verificationSummary: string | null | undefined): string {
   const goalMd = renderGoalMarkdown(goal);
+  // v0.22.6: if a previous audit APPROVED but the regression shield blocked
+  // it, tell THIS run exactly which contract items went unreferenced — the
+  // auditor quotes evidence for them explicitly and the loop converges
+  // instead of repeating the same gap.
+  const shieldGaps = [...(goal.auditHistory ?? [])].reverse().find((v) => v.regressionShieldPassed === false)?.regressionShieldMissing;
   return [
     "You are the independent completion auditor for pi-goal-list-loop-audit.",
     "The executor claims the goal is complete. Your job is to decide whether the user's objective is actually satisfied.",
@@ -124,6 +129,13 @@ function buildGoalAuditorPrompt(goal: Goal, completionSummary: string | null | u
       "<verification_contract>",
       goal.verificationContract.trim(),
       "</verification_contract>",
+    ] : []),
+    ...(shieldGaps && shieldGaps.length > 0 ? [
+      "",
+      "REGRESSION SHIELD RETRY: a previous audit of yours ended in <approved/>, but the orchestrator blocked it",
+      "because the report never referenced these contract items in its evidence:",
+      ...shieldGaps.map((i) => `- ${i}`),
+      "This time, address each of them explicitly: name the item and paste the raw output that proves it.",
     ] : []),
     "",
     "Audit checklist:",

@@ -95,6 +95,8 @@ export interface AuditVerdict {
   error?: string;
   /** regression_shield outcome when the goal had a verification contract. */
   regressionShieldPassed?: boolean;
+  /** Contract items the shield found unreferenced (fed into the next audit's prompt, v0.22.6). */
+  regressionShieldMissing?: string[];
 }
 
 /**

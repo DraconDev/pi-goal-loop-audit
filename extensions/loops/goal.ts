@@ -1314,6 +1314,7 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
           report: result.output,
           error: result.error,
           regressionShieldPassed: result.regressionShieldPassed,
+          regressionShieldMissing: result.regressionShieldMissing,
         });
         // Cap history — 39 infra errors taught us unbounded growth is real.
         if (history.length > 20) history.splice(0, history.length - 20);
@@ -1367,6 +1368,29 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
           content: [{
             type: "text",
             text: `The auditor could not run (infrastructure, NOT a verdict): ${result.error}\nYour completion claim was not evaluated. Fix the auditor model with /glla model=provider/id and call complete_goal again — do not change your deliverable for this.`,
+          }],
+          details: {},
+        };
+      }
+
+      // Shield-blocked approval (v0.22.6): the auditor APPROVED but the
+      // regression shield found contract items the evidence never
+      // referenced. NOT a verdict on the work — the next audit is told
+      // exactly what to quote. (The hegemon case: three genuine approvals
+      // shield-blocked on vocabulary mismatches read as a "parser bug".)
+      if (result.regressionShieldPassed === false && result.regressionShieldMissing && result.regressionShieldMissing.length > 0) {
+        const missing = result.regressionShieldMissing;
+        updateGoal({
+          status: "active",
+          auditHistory: history,
+          pauseReason: `regression shield: auditor approved, but evidence never referenced ${missing.length} contract item(s)`,
+          pauseSuggestedAction: "call complete_goal again — the next auditor run is told exactly which items to quote evidence for",
+        }, ctx);
+        scheduleContinuation(ctx, true);
+        return {
+          content: [{
+            type: "text",
+            text: `The auditor APPROVED, but the orchestrator's regression shield blocked completion: the report's evidence never referenced these contract items:\n${missing.map((i) => `- ${i}`).join("\n")}\n\nThis is NOT a verdict on your work — do not change your deliverable for this. Call complete_goal again; the next auditor run is explicitly told to quote raw evidence for each of these items.`,
           }],
           details: {},
         };
