@@ -2,7 +2,7 @@
 # pi-goal-list-loop-audit — live integration smoke
 #
 # Drives a real pi session in tmux against a scratch dir and asserts on the
-# .pi-gla ledger. This is the M2 "integration harness": it exercises the full
+# .pi-glla ledger. This is the M2 "integration harness": it exercises the full
 # loop (goal → agent work → complete_goal → isolated auditor → archive) with
 # real models, which unit tests cannot do.
 #
@@ -43,7 +43,7 @@ wait_for() { # wait_for <pattern> <timeout-s>
   return 1
 }
 ledger_has() { # ledger_has <jq-ish python expr substring>
-  python3 - "$1" "$WORK/.pi-gla/active.jsonl" <<'EOF'
+  python3 - "$1" "$WORK/.pi-glla/active.jsonl" <<'EOF'
 import json, sys
 needle, path = sys.argv[1], sys.argv[2]
 try:
@@ -81,7 +81,7 @@ case "$SCENARIO" in
     sleep 2
     if [ -f "$WORK/smoke.txt" ]; then pass "smoke.txt created"; else fail "smoke.txt missing"; fi
     if ledger_has '"approved":true'; then pass "ledger records approval"; else fail "ledger missing approval"; fi
-    if ls "$WORK/.pi-gla/archive/"*.md >/dev/null 2>&1; then pass "goal archived"; else fail "archive empty"; fi
+    if ls "$WORK/.pi-glla/archive/"*.md >/dev/null 2>&1; then pass "goal archived"; else fail "archive empty"; fi
     if ledger_has '"regressionShieldPassed":true'; then pass "regression_shield recorded"; else fail "shield outcome missing"; fi
     ;;
 
@@ -93,11 +93,11 @@ case "$SCENARIO" in
     if wait_for "approved by auditor" 120; then pass "item 1 approved"; else fail "item 1 not approved"; fi
     # wait for second archive file
     for i in $(seq 1 120); do
-      n=$(ls "$WORK/.pi-gla/archive/"*.md 2>/dev/null | wc -l)
+      n=$(ls "$WORK/.pi-glla/archive/"*.md 2>/dev/null | wc -l)
       [ "$n" -ge 2 ] && break
       sleep 1
     done
-    n=$(ls "$WORK/.pi-gla/archive/"*.md 2>/dev/null | wc -l)
+    n=$(ls "$WORK/.pi-glla/archive/"*.md 2>/dev/null | wc -l)
     if [ "$n" -ge 2 ]; then pass "both items archived ($n)"; else fail "only $n archived"; fi
     if [ -f "$WORK/a.txt" ] && [ -f "$WORK/b.txt" ]; then pass "both files created"; else fail "files missing"; fi
     if ledger_has '"list":[]'; then pass "list drained"; else fail "list not empty"; fi
@@ -119,7 +119,7 @@ case "$SCENARIO" in
     echo 5 > "$WORK/num.txt"
     NOTIFY_LOG="$WORK/notify.log"
     # project scope — never write test config into the user's GLOBAL settings
-    send "/gla project notify='echo \$1 >> $NOTIFY_LOG'"
+    send "/glla project notify='echo \$1 >> $NOTIFY_LOG'"
     sleep 4
     send '/loop start "Reduce the number in num.txt toward zero, never below 0" measure="cat num.txt" direction=min window=3 max=12'
     say "waiting for plateau stop (up to 300s)"

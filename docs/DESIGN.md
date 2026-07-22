@@ -179,7 +179,7 @@ active → aborted           (user /pi-gla-cancel)
 
 ### Decision 9: JSONL state (deterministic compaction)
 
-Goal state lives in `.pi-gla/active.jsonl`. Each line is a state transition. On compaction, the summary is rebuilt deterministically from the JSONL (autoresearch pattern).
+Goal state lives in `.pi-glla/active.jsonl`. Each line is a state transition. On compaction, the summary is rebuilt deterministically from the JSONL (autoresearch pattern).
 
 This protects against model-generated summaries losing fidelity.
 

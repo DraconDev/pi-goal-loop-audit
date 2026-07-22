@@ -334,7 +334,17 @@ export const DEFAULT_STATE: State = {
 // =================================================================
 
 export function piGlaDir(cwd: string): string {
-  return path.join(cwd, ".pi-gla");
+  const dir = path.join(cwd, ".pi-glla");
+  // v0.17.0: one-time migration of the pre-rename state dir (.pi-gla →
+  // .pi-glla). Active goals, ledgers, and project settings move with the
+  // name — no relics, no lost state.
+  const legacy = path.join(cwd, ".pi-gla");
+  try {
+    if (!fs.existsSync(dir) && fs.existsSync(legacy)) fs.renameSync(legacy, dir);
+  } catch {
+    // read-only fs or partial state — fall through and use the new dir
+  }
+  return dir;
 }
 
 export function goalMdPath(cwd: string, id: string): string {

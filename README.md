@@ -40,7 +40,7 @@ Four top-level commands, that's all:
 /goal cancel                       # abort
 /goal tweak "<new objective>"      # edit in place (Confirm dialog)
 /goal archive                      # archived goals, newest first
-/gla                               # open the settings UI (or /gla key=value)
+/glla                               # open the settings UI (or /glla key=value)
 /list add                          # draft a contract (or a whole batch via items[])
 /list add "<objective>"            # queue one directly
 /list add plan.md                  # file detected → bulk import, one Confirm
@@ -151,7 +151,7 @@ Each loop is a different policy class on the same status machine.
 
 ## Live TUI (always know it's on)
 
-A persistent `gla:` status segment + an above-editor widget show the current
+A persistent `glla:` status segment + an above-editor widget show the current
 goal/loop at all times: objective, status, elapsed, tokens, next task or loop
 metric, pause reason, and live auditor progress during audits. If something is
 running, you can see it — no command needed.
@@ -166,19 +166,19 @@ No external watchdog plugin needed.
 ## Config (one global place, rarely opened)
 
 ```
-/gla                                # open the settings UI
-/gla model=provider/id              # auditor model override → GLOBAL
-/gla thinking=high                  # auditor thinking → GLOBAL
-/gla notify='cmd "$1"'              # push on complete/pause/stop → GLOBAL
-/gla tokenlimit=10000000            # per-goal token budget (default: off) → GLOBAL
-/gla tokenlimit=0                   # explicitly no cap (the default)
-/gla project tokenlimit=500         # rare per-project override
+/glla                                # open the settings UI
+/glla model=provider/id              # auditor model override → GLOBAL
+/glla thinking=high                  # auditor thinking → GLOBAL
+/glla notify='cmd "$1"'              # push on complete/pause/stop → GLOBAL
+/glla tokenlimit=10000000            # per-goal token budget (default: off) → GLOBAL
+/glla tokenlimit=0                   # explicitly no cap (the default)
+/glla project tokenlimit=500         # rare per-project override
 ```
 
 Resolution per key: **project > global > defaults**. The auditor defaults to
 your pi session model. When the session provider is extension-registered the
 auditor can't auth it — you're told once (info level) with the fix:
-`/gla model=provider/id`, set once, rarely touched again. The plugin never
+`/glla model=provider/id`, set once, rarely touched again. The plugin never
 picks a model itself. Thinking follows the session too (floor `high`).
 
 ## Token guard
@@ -186,7 +186,7 @@ picks a model itself. Thinking follows the session too (floor `high`).
 Every goal tracks real token usage; crossing the budget pauses the goal.
 Default 10,000,000 per goal — a runaway threshold, not a big-goal threshold
 (real research/feature goals legitimately burn 2-4M). Tune with
-`/gla tokenlimit=<n>`. Loop 3 doesn't need this cap — it has its own brakes
+`/glla tokenlimit=<n>`. Loop 3 doesn't need this cap — it has its own brakes
 (max iterations + plateau).
 
 ## Compatibility (what goes well, what conflicts)
@@ -212,8 +212,8 @@ not requirements).
 
 **Two footnotes**: (1) extension-registered providers work in the main session
 but not the auditor's extension-less session — if audits fail auth, set the
-override once with `/gla model=`. (2) `pi-notify-agent` notifies on every turn;
-`/gla notify=` fires only on goal complete/pause/loop stop.
+override once with `/glla model=`. (2) `pi-notify-agent` notifies on every turn;
+`/glla notify=` fires only on goal complete/pause/loop stop.
 
 ## Files
 

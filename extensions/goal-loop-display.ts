@@ -46,28 +46,28 @@ export interface AuditDisplayProgress {
 }
 
 /**
- * One-line status for ctx.ui.setStatus("pi-gla", …).
+ * One-line status for ctx.ui.setStatus("pi-glla", …).
  * Returns undefined when nothing is being supervised (clears the segment).
  */
 export function buildStatusText(state: State, audit?: AuditDisplayProgress | null, now = Date.now()): string | undefined {
   if (state.loop?.active) {
     const l = state.loop;
     const arrow = l.direction === "min" ? "↓" : "↑";
-    return `gla: loop ${arrow} iter ${l.iteration}/${l.maxIterations} · best ${l.bestValue ?? "n/a"} · stall ${l.stallCount}/${l.plateauWindow}`;
+    return `glla: loop ${arrow} iter ${l.iteration}/${l.maxIterations} · best ${l.bestValue ?? "n/a"} · stall ${l.stallCount}/${l.plateauWindow}`;
   }
   const g = state.goal;
   if (!g) return undefined;
   if (g.status === "auditing") {
     const tool = audit?.currentTool ? ` · ${audit.currentTool}` : "";
-    return `gla: auditing…${tool}`;
+    return `glla: auditing…${tool}`;
   }
   if (g.status === "paused") {
-    return `gla: paused ⏸ ${truncate(g.pauseReason ?? "", 40)}`;
+    return `glla: paused ⏸ ${truncate(g.pauseReason ?? "", 40)}`;
   }
   if (g.status === "active") {
     const queue = state.list?.length ? ` · list ${state.list.length}` : "";
     const tasks = g.taskList ? ` ${countDone(g)}/${countTotal(g)} tasks ·` : "";
-    return `gla: goal ●${tasks} ${fmtElapsed(now - Date.parse(g.createdAt))}${queue}`;
+    return `glla: goal ●${tasks} ${fmtElapsed(now - Date.parse(g.createdAt))}${queue}`;
   }
   return undefined; // complete/aborted → clear
 }
@@ -99,7 +99,7 @@ function countTotal(g: Goal): number {
 // ---- above-editor widget (multi-line panel) ----
 
 /**
- * Widget lines for ctx.ui.setWidget("pi-gla", lines).
+ * Widget lines for ctx.ui.setWidget("pi-glla", lines).
  * Returns undefined when nothing is worth showing.
  */
 export function buildWidgetLines(state: State, audit?: AuditDisplayProgress | null, now = Date.now()): string[] | undefined {

@@ -31,7 +31,7 @@ The auditor runs in a **fresh session with no extensions**, so it can only use
 You select the model in pi; the auditor uses it. The plugin never picks a
 model itself. The resolution is just:
 
-1. your explicit `/gla model=provider/id` override (rare), else
+1. your explicit `/glla model=provider/id` override (rare), else
 2. the pi session model — whatever you selected in pi.
 
 If your session model's provider is extension-registered, the auditor's
@@ -40,7 +40,7 @@ with the two fixes: switch pi's model to a built-in provider, or set the
 override:
 
 ```
-/gla model=provider/model-id
+/glla model=provider/model-id
 ```
 
 Whatever you choose must work extension-less. Verify with:
@@ -92,7 +92,7 @@ After installing:
    - The file is committed
    "
    ```
-2. The orchestrator creates `.pi-gla/goals/<id>.md`, schedules continuation, and the agent starts.
+2. The orchestrator creates `.pi-glla/goals/<id>.md`, schedules continuation, and the agent starts.
 3. The agent reads the goal, makes the change, runs the verification, and calls `complete_goal`.
 4. The orchestrator spawns the isolated auditor.
 5. The auditor inspects files, runs `curl`, reads `git log`.
@@ -103,10 +103,10 @@ After installing:
 While the loop runs:
 
 ```bash
-ls .pi-gla/                  # see live state
-cat .pi-gla/active.jsonl | tail -5
-cat .pi-gla/goals/<id>.md    # current goal markdown
-ls .pi-gla/archive           # past goals
+ls .pi-glla/                  # see live state
+cat .pi-glla/active.jsonl | tail -5
+cat .pi-glla/goals/<id>.md    # current goal markdown
+ls .pi-glla/archive           # past goals
 ```
 
 ## v0.1.0 verification status (2026-07-20, all live-verified)

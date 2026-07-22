@@ -142,8 +142,8 @@ let uiTicker: NodeJS.Timeout | null = null;
 function refreshUI(ctx: ExtensionContext): void {
   if (!ctx.hasUI) return;
   try {
-    ctx.ui.setStatus("pi-gla", buildStatusText(state, latestAuditProgress));
-    ctx.ui.setWidget("pi-gla", buildWidgetLines(state, latestAuditProgress));
+    ctx.ui.setStatus("pi-glla", buildStatusText(state, latestAuditProgress));
+    ctx.ui.setWidget("pi-glla", buildWidgetLines(state, latestAuditProgress));
   } catch {
     // stale ctx — next event refreshes
   }
@@ -848,7 +848,7 @@ function notifyExternal(ctx: ExtensionContext, message: string): void {
 }
 
 // =================================================================
-// Loop 3: /loop — metric-driven forever loop
+// Loop 3: /loop — metric-driven process loop (never completes)
 //
 // The anti-doorknob law: the loop only believes a number. The orchestrator
 // runs the user's measure command (via pi.exec) after every agent turn;
@@ -1423,7 +1423,7 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
     parameters: Type.Object({
       objective: Type.String({ description: "The clarified, concrete objective (single item) or a summary when items[] is used" }),
       verificationContract: Type.Optional(Type.String({ description: "Checkable done-criteria (commands, file states, test outcomes)" })),
-      items: Type.Optional(Type.Array(Type.String(), { description: "LIST drafting only: many objectives at once (e.g. 'queue these 50 things'). Each becomes a queue item; per-item 'Done when:' clauses are honored." })),
+      items: Type.Optional(Type.Array(Type.String(), { description: "LIST drafting only: many objectives at once (e.g. 'queue these 50 things'). Each becomes a list item; per-item 'Done when:' clauses are honored." })),
     }),
     async execute(_id, params, _signal, _onUpdate, execCtx) {
       const p = params as { objective: string; verificationContract?: string; items?: string[] };
@@ -2090,7 +2090,7 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
 // We detect duplicates at session start and warn loudly once.
 // =================================================================
 
-const OUR_COMMANDS = ["goal", "gla", "list", "queue", "loop"];
+const OUR_COMMANDS = ["goal", "glla", "list", "loop"];
 let collisionWarned = false;
 
 // Providers verified to exist in a bare (extension-less) session. The auditor
@@ -2168,23 +2168,12 @@ export default function (pi: ExtensionAPI): void {
     description: "Open the settings UI for goals, loops, lists, and the auditor. Scriptable form: /glla key=value · /glla project key=value",
     handler: settingsHandler,
   });
-  // /gla kept as an alias (renamed package, v0.15.0) — muscle memory is real.
-  pi.registerCommand("gla", {
-    description: "Alias for /glla (package renamed to pi-goal-list-loop-audit in v0.15.0).",
-    handler: settingsHandler,
-  });
   pi.registerCommand("list", {
     description: "Loop 2: the list of audited goals — order is the default, not the law. /list add <obj or file or paste> | /list show | /list next [n] | /list remove <n> | /list clear",
     handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdList(args, ctx); },
   });
-  // Alias for one release (renamed 0.10.0 back to /list — order isn't
-  // mandatory with subagents; it's a shopping list, not a FIFO).
-  pi.registerCommand("queue", {
-    description: "Alias for /list (renamed in v0.10.0). Same subcommands.",
-    handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdList(args, ctx); },
-  });
   pi.registerCommand("loop", {
-    description: "Loop 3: metric-driven forever loop. /loop start \"<target>\" measure=\"<cmd>\" direction=min|max [done=<value>] [window=5] [max=50] | /loop status | /loop stop",
+    description: "Loop 3: metric-driven process — it never completes. /loop start \"<target>\" measure=\"<cmd>\" direction=min|max [window=5] [max=50] [time=<hours>] [tokens=<budget>] [branch=1] | /loop status | /loop stop. 'Improve until X' is a /goal, not a loop.",
     handler: (args: string, ctx: ExtensionContext) => { rememberCtx(ctx); return cmdLoop(args, ctx); },
   });
 

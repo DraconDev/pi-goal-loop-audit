@@ -43,7 +43,7 @@ You have `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`, and the goal too
 
 If the objective decomposes into milestones and no task list exists yet, call `propose_task_list` early — the user confirms it, then you track progress with `complete_task` / `update_task_status` as you go (not in a batch at the end). Limits: 20 tasks, 5 subtasks per task.
 
-When the agent calls any of these, the orchestrator tracks the call and persists state to `.pi-gla/active.jsonl`.
+When the agent calls any of these, the orchestrator tracks the call and persists state to `.pi-glla/active.jsonl`.
 
 ## TASK WORKFLOW
 
