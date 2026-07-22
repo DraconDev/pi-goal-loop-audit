@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.21.0] — 2026-07-22
+
+### Changed — session restore no longer auto-starts work in fresh sessions
+
+Opening pi in a folder with an active goal used to fire work immediately —
+before you could even load your old session, a fresh empty session was
+already burning turns with zero conversation context. Restore is now gated
+on `session_start.reason`:
+
+- **"resume" / "reload" / "fork"** — the session carries the goal's
+  conversation: auto-resume, as before.
+- **"startup" / "new" (or no reason, older pi)** — fresh session: HOLD.
+  Goals restore paused ("restored in a fresh session — no work started",
+  /goal resume to continue); loops restore held (/loop with no args resumes
+  a held loop instead of drafting); a waiting list notifies instead of
+  auto-activating the head.
+- **/glla autoresume=on** — new setting (global or project) restoring the
+  old auto-resume-everywhere behavior. Set it per rig project for
+  unattended restarts. Default off.
+
+The gate is one mechanical predicate (`shouldAutoResumeOnSessionStart`),
+unit-tested across all five reasons plus the autoresume override.
+
 ## [0.20.1] — 2026-07-22
 
 ### Fixed — the liveness signal looked frozen
