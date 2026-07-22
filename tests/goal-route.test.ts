@@ -101,3 +101,27 @@ test("draftProposalBlock: 0 replies → block with instructions, ≥1 → null",
   assert.equal(draftProposalBlock(5), null);
 });
 
+
+test("draftProposalBlock: escape hatch after 3 blocked proposals (v0.15.1)", () => {
+  assert.match(draftProposalBlock(0)!, /INTERVIEW FIRST/);
+  assert.doesNotMatch(draftProposalBlock(0, 2)!, /escape|type any chat/i);
+  const hatched = draftProposalBlock(0, 3)!;
+  assert.match(hatched, /type any chat message/i);
+  assert.match(hatched, /Do NOT ask another interview question/);
+  assert.equal(draftProposalBlock(1, 99), null); // floor met: never blocks
+});
+
+test("askUserQuestionAnswered: answered dialog counts, cancel/esc does not (v0.15.1)", () => {
+  const answered = { answers: [{ question: "q", answer: "a" }], cancelled: false };
+  assert.equal(askUserQuestionAnswered("ask_user_question", answered), true);
+  // Esc-abandoned questionnaire must NOT open the gate
+  assert.equal(askUserQuestionAnswered("ask_user_question", { answers: [], cancelled: true }), false);
+  assert.equal(askUserQuestionAnswered("ask_user_question", { answers: [], cancelled: true, error: "no_ui" }), false);
+  // empty answers without cancel is degenerate — no
+  assert.equal(askUserQuestionAnswered("ask_user_question", { answers: [], cancelled: false }), false);
+  // other tools never count
+  assert.equal(askUserQuestionAnswered("bash", answered), false);
+  // missing/garbage details never count
+  assert.equal(askUserQuestionAnswered("ask_user_question", undefined), false);
+  assert.equal(askUserQuestionAnswered("ask_user_question", "User has answered"), false);
+});

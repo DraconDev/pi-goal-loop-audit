@@ -275,9 +275,29 @@ export function buildSeedGrillMessage(tmpl: string, seed: string, tool: string):
  * mechanism guarantees an interview HAPPENED; question quality is the
  * model's job (shaped by buildSeedGrillMessage).
  */
-export function draftProposalBlock(userReplies: number): string | null {
+export function draftProposalBlock(userReplies: number, blockedAttempts = 0): string | null {
   if (userReplies > 0) return null;
-  return "INTERVIEW FIRST — you have not received a single user reply since drafting started. Ask the user ONE sharp question about their objective (seed-specific, with a recommended default; challenge non-answers by offering concrete options), wait for the answer, and only then call the propose tool again. The Confirm dialog stays closed until the user has actually been heard.";
+  const base = "INTERVIEW FIRST — you have not received a single user reply since drafting started. Ask the user ONE sharp question about their objective (seed-specific, with a recommended default; challenge non-answers by offering concrete options), wait for the answer, and only then call the propose tool again. The Confirm dialog stays closed until the user has actually been heard.";
+  // v0.15.1 escape hatch: typed chat replies AND answered ask_user_question
+  // dialogs both count. If we have blocked 3+ proposals, the replies are
+  // arriving through a path this plugin cannot see — hand the user a manual
+  // unlock instead of manufacturing yet another interview round.
+  if (blockedAttempts >= 3) {
+    return base + " NOTE: proposals have been blocked repeatedly despite interviewing — the reply counter may not see your channel. Tell the user plainly: 'type any chat message (e.g. \"go on\") to unlock the Confirm dialog', wait for it, then propose again. Do NOT ask another interview question first.";
+  }
+  return base;
+}
+
+/**
+ * v0.15.1: an ask_user_question tool result counts as a user reply during
+ * drafting — dialog answers arrive as tool results, not chat messages.
+ * Answered = not cancelled (Esc) with at least one answer recorded.
+ */
+export function askUserQuestionAnswered(toolName: string, details: unknown): boolean {
+  if (toolName !== "ask_user_question") return false;
+  if (!details || typeof details !== "object") return false;
+  const d = details as { answers?: unknown; cancelled?: unknown };
+  return d.cancelled === false && Array.isArray(d.answers) && d.answers.length > 0;
 }
 
 /**

@@ -39,6 +39,7 @@ import {
   takeAt,
   goalArgsNeedDrafting,
   buildSeedGrillMessage,
+  askUserQuestionAnswered,
   draftProposalBlock,
   type TaskProposal,
   validateTaskProposal,
@@ -110,6 +111,7 @@ let draftingTarget: "goal" | "list" | "loop" | null = null;
 // v0.14.0 drafting floor: user replies counted while drafting; the injected
 // seed prompt itself arrives as a user message — skip exactly that one.
 let draftingUserReplies = 0;
+let draftingBlockedProposals = 0; // v0.15.1: stuck-gate escape hatch
 let draftingSeedInFlight = false;
 
 // Dedup set for token accounting (agent_end may replay seen messages).
@@ -458,6 +460,7 @@ async function startDrafting(ctx: ExtensionContext, target: "goal" | "list" | "l
   try {
     extensionApi?.sendUserMessage(tmpl, { deliverAs: ctx.isIdle() ? "followUp" : "steer" });
     draftingUserReplies = 0;
+    draftingBlockedProposals = 0;
     draftingSeedInFlight = true; // our injected prompt also arrives as a user message — don't count it
   } catch {
     draftingTarget = null;
@@ -1420,7 +1423,9 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
         };
       }
       // v0.14.0: the interview floor — no Confirm until the user replied.
-      const block = draftProposalBlock(draftingUserReplies);
+      // v0.14.0: the interview floor — no Confirm until the user replied.
+      if (draftingUserReplies === 0) draftingBlockedProposals++;
+      const block = draftProposalBlock(draftingUserReplies, draftingBlockedProposals);
       if (block) {
         return { content: [{ type: "text", text: block }], details: {} };
       }
@@ -1525,7 +1530,8 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
         };
       }
       // v0.14.0: the interview floor — no Confirm until the user replied.
-      const loopBlock = draftProposalBlock(draftingUserReplies);
+      if (draftingUserReplies === 0) draftingBlockedProposals++;
+      const loopBlock = draftProposalBlock(draftingUserReplies, draftingBlockedProposals);
       if (loopBlock) {
         return { content: [{ type: "text", text: loopBlock }], details: {} };
       }
@@ -2186,6 +2192,15 @@ export default function (pi: ExtensionAPI): void {
       return;
     }
     draftingUserReplies++;
+  });
+
+  // v0.15.1: ask_user_question answers arrive as tool results, not chat
+  // messages — count answered (non-cancelled) questionnaires as replies too.
+  pi.on("tool_result", async (event: any) => {
+    if (draftingTarget === null) return;
+    if (askUserQuestionAnswered(String(event?.toolName ?? ""), event?.details)) {
+      draftingUserReplies++;
+    }
   });
 
   pi.on("session_start", async (_event: any, ctx: ExtensionContext) => {
