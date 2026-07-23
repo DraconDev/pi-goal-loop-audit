@@ -1,58 +1,18 @@
-// pi-goal-list-loop-audit — v0.1.0
+// pi-goal-list-loop-audit
 // tests/extract-verification.test.ts
 //
-// Smoke tests for the inline extractVerificationContract we use in loops/goal.ts.
-// We re-implement the function here to test the logic in isolation rather than
-// importing the orchestrator (which requires a live ExtensionContext).
-//
-// v0.1.0: extract contract lives inside the orchestrator.
-// v0.2.0: hoists it to goal-loop-draft.ts and consumes the same logic.
+// v0.23.7: imports the REAL extractVerificationContract from goal-loop-core.
+// The pre-0.23.7 version of this file re-implemented the function in the
+// test "to avoid importing the orchestrator" — the copy silently went stale
+// (its header even pointed at a goal-loop-draft.ts that no longer exists).
+// Testing a copy is testing nothing; the function lives in the pure module
+// precisely so this file can import it.
 
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
 
-function extractVerificationContract(raw: string): { objective: string; verificationContract: string } {
-  const lines = raw.split("\n");
-  let mode: "obj" | "verify" = "obj";
-  const objParts: string[] = [];
-  const verifyParts: string[] = [];
-  for (const line of lines) {
-    const lower = line.toLowerCase();
-    if (lower.match(/^\s*(?:done when|verify|verified when|verification|done):/)) {
-      mode = "verify";
-    }
-    if (mode === "obj") objParts.push(line);
-    else verifyParts.push(line);
-  }
-  let objective = objParts.join("\n").trim();
-  let verificationContract = verifyParts.join("\n").trim();
-  if (!verificationContract) {
-    const m = raw.match(/^(.*?)(?:\.|;)??\s+(done when|verified when|verify|verification)\s*:\s*(.+)$/is);
-    if (m) {
-      objective = (m[1] ?? "").trim().replace(/[.;]\s*$/, "");
-      verificationContract = (m[3] ?? "").trim();
-    }
-  }
-  return { objective, verificationContract };
-}
-
-test("no marker returns full text as objective", () => {
-  const r = extractVerificationContract("Step 1. Step 2.");
-  assert.equal(r.objective, "Step 1. Step 2.");
-  assert.equal(r.verificationContract, "");
-});
-
-test("'Done when:' splits correctly", () => {
-  const r = extractVerificationContract("Make the test pass.\nDone when: npm test exits 0");
-  assert.equal(r.objective, "Make the test pass.");
-  assert.equal(r.verificationContract, "Done when: npm test exits 0");
-});
-
-test("'Verify:' alias works", () => {
-  const r = extractVerificationContract("Add widget.\nVerify: grep widget foo.ts");
-  assert.equal(r.objective, "Add widget.");
-  assert.equal(r.verificationContract, "Verify: grep widget foo.ts");
-});
+import { extractVerificationContract, goalArgsNeedDrafting, normalizeDraftContract } from "../extensions/goal-loop-core.ts";
+import { contractItems } from "../extensions/goal-loop-shield.ts";
 
 test("inline one-liner: 'Done when:' mid-line is extracted", () => {
   const r = extractVerificationContract("Create file x.txt containing ok. Done when: grep -q ok x.txt");
@@ -91,4 +51,39 @@ Done when:
   assert.ok(r.objective.includes("Step 1"));
   assert.ok(r.verificationContract.includes("npm test"));
   assert.ok(r.verificationContract.includes("grep -r"));
+});
+
+// ---- v0.23.7: the "done when" family accepts text before the colon ----
+
+test("line marker: 'Done when ALL of the following are true:' starts the contract", () => {
+  const r = extractVerificationContract("Polish the routes.\nDone when ALL of the following are true:\n- route A renders\n- route B persists");
+  assert.equal(r.objective, "Polish the routes.");
+  assert.ok(r.verificationContract.includes("route A renders"));
+});
+
+test("inline marker: 'Done when ALL of the following are true:' mid-line", () => {
+  const r = extractVerificationContract("Polish the routes. Done when ALL of the following are true: every route renders");
+  assert.equal(r.objective, "Polish the routes");
+  assert.equal(r.verificationContract, "every route renders");
+});
+
+test("goalArgsNeedDrafting: 'Done when ALL of the following' counts as a contract (no interview)", () => {
+  assert.equal(goalArgsNeedDrafting("Fix X. Done when ALL of the following are true: a, b, c"), false);
+  assert.equal(goalArgsNeedDrafting("make it better"), true);
+});
+
+// ---- v0.23.7: round-trip chain — what the draft dialog stores is what the
+// shield later parses. normalizeDraftContract (render+store) → stored text →
+// extractVerificationContract (list/tweak paths) → contractItems (shield).
+
+test("round-trip: normalized draft survives storage and yields clean shield items", () => {
+  const modelContract = "Done when ALL of the following are true:\n- combat-debug route renders without console errors\n- art-demo-v7 variants persist across reload";
+  const normalized = normalizeDraftContract(modelContract);
+  const stored = `Audit-driven fix-and-polish pass.\nDone when:\n${normalized}`;
+  const extracted = extractVerificationContract(stored);
+  assert.equal(extracted.objective, "Audit-driven fix-and-polish pass.");
+  assert.deepEqual(contractItems(extracted.verificationContract), [
+    "combat-debug route renders without console errors",
+    "art-demo-v7 variants persist across reload",
+  ]);
 });
