@@ -8,7 +8,7 @@
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
 
-import { askUserQuestionAnswered, buildSeedGrillMessage, draftContractItemCount, draftProposalBlock, goalArgsNeedDrafting, normalizeDraftContract, routeGoalArgs } from "../extensions/goal-loop-core.ts";
+import { askUserQuestionAnswered, buildSeedGrillMessage, classifySessionCtx, draftContractItemCount, draftProposalBlock, goalArgsNeedDrafting, normalizeDraftContract, routeGoalArgs } from "../extensions/goal-loop-core.ts";
 
 test("empty args → draft", () => {
   assert.deepEqual(routeGoalArgs(""), { kind: "draft" });
@@ -164,4 +164,26 @@ test("normalizeDraftContract: prose lines pass through untouched", () => {
 test("draftContractItemCount counts numbered items only", () => {
   assert.equal(draftContractItemCount("note\n1. a\n2. b"), 2);
   assert.equal(draftContractItemCount("plain prose"), 0);
+});
+
+// ---- v0.23.8: subagent-session ownership (classifySessionCtx) ----
+
+test("classifySessionCtx: no owner yet → claim", () => {
+  assert.equal(classifySessionCtx(null, false, {}), "claim");
+});
+
+test("classifySessionCtx: owner stale → claim (session replaced via /new)", () => {
+  const sm = {};
+  assert.equal(classifySessionCtx(sm, false, {}), "claim");
+});
+
+test("classifySessionCtx: same sessionManager → refresh (main session event)", () => {
+  const sm = {};
+  assert.equal(classifySessionCtx(sm, true, sm), "refresh");
+});
+
+test("classifySessionCtx: different sessionManager → foreign (subagent session)", () => {
+  const main = {};
+  const subagent = {};
+  assert.equal(classifySessionCtx(main, true, subagent), "foreign");
 });

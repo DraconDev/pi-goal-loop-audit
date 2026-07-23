@@ -56,6 +56,7 @@ import {
   normalizeDraftContract,
   draftContractItemCount,
   extractVerificationContract,
+  classifySessionCtx,
   readState,
   renderGoalMarkdown,
   shouldAutoResumeOnSessionStart,
@@ -125,6 +126,15 @@ function rememberCtx(ctx: ExtensionContext): void {
 /** True when ctx belongs to a subagent/foreign session, not the loop owner. */
 function isForeignCtx(ctx: ExtensionContext): boolean {
   return ownerSession !== null && ctx.sessionManager !== ownerSession;
+}
+
+const FOREIGN_SESSION_TOOL_MESSAGE =
+  "This tool changes goal/loop/list state, which only the MAIN session owns — you are running in a subagent session. Report back to the main agent; it owns the goal and can call this tool.";
+
+/** Refusal message when a state-mutating tool is called from a subagent session, else null. */
+function foreignToolGuard(execCtx: unknown): string | null {
+  const c = execCtx as ExtensionContext | undefined;
+  return c && isForeignCtx(c) ? FOREIGN_SESSION_TOOL_MESSAGE : null;
 }
 
 let state: State = { goal: null };
@@ -378,7 +388,7 @@ function persistState(ctx: ExtensionContext): void {
 }
 
 function setGoal(goal: Goal, ctx: ExtensionContext): void {
-  state = { goal, list: state.list ?? [] }; // preserve the queue!
+  state = { goal, list: state.list ?? [] }; // preserve the list!
   const file = writeGoalMd(ctx.cwd, goal);
   state.goal!.activePath = path.relative(ctx.cwd, file) || file;
   persistState(ctx);
@@ -470,7 +480,7 @@ async function startDrafting(ctx: ExtensionContext, target: "goal" | "list" | "l
     if (target === "list") {
       tmpl = tmpl.replace(
         "[GOAL DRAFTING]",
-        "[GOAL DRAFTING — the confirmed goal goes into the /list LIST, it does not activate immediately. If the user wants MANY things queued (a plan, a checklist, 'these 50 tasks'), propose them ALL AT ONCE with the items[] parameter — one Confirm for the whole batch, never 50 separate proposals.]",
+        "[GOAL DRAFTING — the confirmed goal goes into the /list LIST, it does not activate immediately. If the user wants MANY things added at once (a plan, a checklist, 'these 50 tasks'), propose them ALL AT ONCE with the items[] parameter — one Confirm for the whole batch, never 50 separate proposals.]",
       );
     }
   } catch {
@@ -584,7 +594,7 @@ async function cmdPause(ctx: ExtensionContext): Promise<void> {
   // v0.22.7: name WHAT was paused — a list item resumes through /list.
   if (state.goal.policy === "list") {
     const queued = listQueue().length;
-    ctx.ui.notify(`List item ${state.goal.id} paused${queued > 0 ? ` (${queued} queued in the list)` : ""}. /list resume to continue.`, "info");
+    ctx.ui.notify(`List item ${state.goal.id} paused${queued > 0 ? ` (${queued} waiting in the list)` : ""}. /list resume to continue.`, "info");
     return;
   }
   ctx.ui.notify(`Goal ${state.goal.id} paused. /goal resume to continue.`, "info");
@@ -607,8 +617,8 @@ async function cmdResume(ctx: ExtensionContext): Promise<void> {
   const isListItem = state.goal.policy === "list";
   ctx.ui.notify(
     isListItem
-      ? `Resumed list item [${state.goal.id}]: ${state.goal.objective.replace(/\s+/g, " ").slice(0, 70)}${queued > 0 ? ` (+${queued} queued in the list)` : ""}`
-      : `Resumed goal [${state.goal.id}]: ${state.goal.objective.replace(/\s+/g, " ").slice(0, 70)}${queued > 0 ? ` (+${queued} queued in the list — resuming the list's head)` : ""}`,
+      ? `Resumed list item [${state.goal.id}]: ${state.goal.objective.replace(/\s+/g, " ").slice(0, 70)}${queued > 0 ? ` (+${queued} waiting in the list)` : ""}`
+      : `Resumed goal [${state.goal.id}]: ${state.goal.objective.replace(/\s+/g, " ").slice(0, 70)}${queued > 0 ? ` (+${queued} waiting in the list — resuming the list's head)` : ""}`,
     "info",
   );
   scheduleContinuation(ctx, true);
@@ -671,8 +681,8 @@ async function cmdTweak(args: string, ctx: ExtensionContext): Promise<void> {
   try {
     confirmed = await ctx.ui.confirm(
       "Tweak goal?",
-      `CURRENT:\n${current.objective.slice(0, 400)}\n\nNEW:\n${newObjective.slice(0, 400)}` +
-      (newContract ? `\n\nNew contract:\n${newContract.slice(0, 200)}` : "\n\n(New text carries no contract; old contract is dropped.)"),
+      `CURRENT:\n${current.objective}\n\nNEW:\n${newObjective}` +
+      (newContract ? `\n\nNew contract:\n${newContract}` : "\n\n(New text carries no contract; old contract is dropped.)"),
     );
   } catch {
     confirmed = false;
@@ -717,13 +727,15 @@ async function bulkAddItems(ctx: ExtensionContext, parsed: string[], sourceName:
     ctx.ui.notify("No items found (headings/blank lines don't count).", "warning");
     return;
   }
-  const preview = parsed.slice(0, 5).map((t, i) => `  ${i + 1}. ${t.slice(0, 70)}`).join("\n");
+  // v0.23.7: show ALL items in full — a Confirm the user can't fully
+  // read is not a gate (same rule as the draft dialog, v0.23.5).
+  const preview = parsed.map((t, i) => `  ${i + 1}. ${t}`).join("\n");
   let confirmed = true;
   if (ctx.hasUI) {
     try {
       confirmed = await ctx.ui.confirm(
-        "Import into queue?",
-        `${parsed.length} items from ${sourceName}:\n${preview}${parsed.length > 5 ? `\n  … and ${parsed.length - 5} more` : ""}`,
+        "Import into list?",
+        `${parsed.length} items from ${sourceName}:\n${preview}`,
       );
     } catch {
       confirmed = false;
@@ -735,7 +747,7 @@ async function bulkAddItems(ctx: ExtensionContext, parsed: string[], sourceName:
   }
   const n = enqueueItems(ctx, parsed, sourceName);
   if (state.goal && state.goal.status === "active") {
-    ctx.ui.notify(`Imported ${n} items (${listQueue().length} queued).`, "info");
+    ctx.ui.notify(`Imported ${n} items (${listQueue().length} waiting in the list).`, "info");
   }
 }
 
@@ -761,7 +773,7 @@ async function cmdList(args: string, ctx: ExtensionContext): Promise<void> {
     // is the same motion as /goal resume — named for the surface the user is
     // looking at (v0.22.7: "we would just unpause, and that is next").
     if (!state.goal || state.goal.status !== "paused") {
-      ctx.ui.notify("No paused list item to resume. /list show to see the queue.", "info");
+      ctx.ui.notify("No paused list item to resume. /list show to see the list.", "info");
       return;
     }
     if (state.goal.policy !== "list") {
@@ -902,7 +914,7 @@ function addSingleItem(ctx: ExtensionContext, raw: string): void {
   if (!state.goal || state.goal.status === "complete" || state.goal.status === "aborted") {
     activateNextListItem(ctx);
   } else {
-    ctx.ui.notify(`Queued (${listQueue().length} waiting): ${objective.slice(0, 80)}`, "info");
+    ctx.ui.notify(`Added to the list (${listQueue().length} waiting): ${objective.slice(0, 80)}`, "info");
   }
 }
 
@@ -1333,7 +1345,9 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       completionSummary: Type.Optional(Type.String({ description: "1-paragraph completion claim" })),
       verificationSummary: Type.Optional(Type.String({ description: "Per-item evidence for the verification contract" })),
     }),
-    async execute(_id, params, signal) {
+    async execute(_id, params, signal, _onUpdate, execCtx) {
+      const foreign0 = foreignToolGuard(execCtx);
+      if (foreign0) return { content: [{ type: "text", text: foreign0 }], details: {} };
       if (!state.goal || state.goal.status !== "active") {
         return { content: [{ type: "text", text: "No active goal." }], details: {} };
       }
@@ -1492,7 +1506,9 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       reason: Type.String({ description: "Why the work is paused" }),
       suggestedAction: Type.Optional(Type.String({ description: "What the user should do next" })),
     }),
-    async execute(_id, params) {
+    async execute(_id, params, _signal, _onUpdate, execCtx) {
+      const foreign1 = foreignToolGuard(execCtx);
+      if (foreign1) return { content: [{ type: "text", text: foreign1 }], details: {} };
       const p = params as { reason: string; suggestedAction?: string };
       if (!state.goal) return { content: [{ type: "text", text: "No active goal." }], details: {} };
       updateGoal({
@@ -1571,6 +1587,8 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       items: Type.Optional(Type.Array(Type.String(), { description: "LIST drafting only: many objectives at once (e.g. 'queue these 50 things'). Each becomes a list item; per-item 'Done when:' clauses are honored." })),
     }),
     async execute(_id, params, _signal, _onUpdate, execCtx) {
+      const foreign2 = foreignToolGuard(execCtx);
+      if (foreign2) return { content: [{ type: "text", text: foreign2 }], details: {} };
       const p = params as { objective: string; verificationContract?: string; items?: string[] };
       if (draftingTarget !== "goal" && draftingTarget !== "list") {
         return {
@@ -1579,11 +1597,15 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
         };
       }
       // v0.14.0: the interview floor — no Confirm until the user replied.
-      // v0.14.0: the interview floor — no Confirm until the user replied.
-      if (draftingUserReplies === 0) draftingBlockedProposals++;
-      const block = draftProposalBlock(draftingUserReplies, draftingBlockedProposals);
-      if (block) {
-        return { content: [{ type: "text", text: block }], details: {} };
+      // v0.23.8: /glla autoaccept=on skips the floor AND the Confirm —
+      // the seed carries the intent (unattended rigs). Default off.
+      const autoAccept = loadSettings(ctx.cwd).autoAcceptDrafts === true;
+      if (!autoAccept) {
+        if (draftingUserReplies === 0) draftingBlockedProposals++;
+        const block = draftProposalBlock(draftingUserReplies, draftingBlockedProposals);
+        if (block) {
+          return { content: [{ type: "text", text: block }], details: {} };
+        }
       }
       // Multi-item drafts are LIST-only: a goal is single by definition.
       if (p.items && p.items.length > 0 && draftingTarget !== "list") {
@@ -1600,13 +1622,19 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
         const preview = p.items.map((t, i) => `  ${i + 1}. ${t}`).join("\n");
         const batchActivates = !state.goal || state.goal.status === "complete" || state.goal.status === "aborted";
         let batchConfirmed = false;
-        try {
-          batchConfirmed = await liveCtx.ui.confirm(
-            "Confirm queue batch",
-            `${p.items.length} items:\n${preview}${batchActivates ? "\n\n(List is empty — confirming ACTIVATES item 1 immediately as the active goal.)" : ""}`,
-          );
-        } catch {
-          batchConfirmed = false;
+        if (autoAccept) {
+          batchConfirmed = true;
+          liveCtx.ui.notify(`List batch auto-accepted (/glla autoaccept=on): ${p.items.length} items${batchActivates ? " — item 1 ACTIVATES now" : ""}.`, "info");
+          appendLedger(liveCtx.cwd, "draft_autoaccepted", { kind: "batch", count: p.items.length });
+        } else {
+          try {
+            batchConfirmed = await liveCtx.ui.confirm(
+              "Confirm list batch",
+              `${p.items.length} items:\n${preview}${batchActivates ? "\n\n(List is empty — confirming ACTIVATES item 1 immediately as the active goal.)" : ""}`,
+            );
+          } catch {
+            batchConfirmed = false;
+          }
         }
         if (!batchConfirmed) {
           return {
@@ -1620,7 +1648,7 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
         if (wasIdle) {
           return { content: [{ type: "text", text: `${n} items confirmed; first activated (list was empty). Begin work now.` }], details: {} };
         }
-        return { content: [{ type: "text", text: `${n} items confirmed and queued (${listQueue().length} waiting).` }], details: {} };
+        return { content: [{ type: "text", text: `${n} items confirmed and added to the list (${listQueue().length} waiting).` }], details: {} };
       }
       const normContract = p.verificationContract?.trim() ? normalizeDraftContract(p.verificationContract) : "";
       const checkCount = normContract ? draftContractItemCount(normContract) : 0;
@@ -1634,14 +1662,20 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       const willActivate = isListDraft && (!state.goal || state.goal.status === "complete" || state.goal.status === "aborted");
       const activationNote = isListDraft
         ? willActivate
-          ? "\n\n(List is empty — confirming ACTIVATES this immediately as the active goal. Reject if you only wanted to queue it.)"
-          : "\n\n(Goes into the list, queued behind the active goal.)"
+          ? "\n\n(List is empty — confirming ACTIVATES this immediately as the active goal. Reject if you only wanted to add it, not start it.)"
+          : "\n\n(Goes into the list, waiting behind the active goal.)"
         : "";
       let confirmed = false;
-      try {
-        confirmed = await liveCtx.ui.confirm(isListDraft ? "Confirm list item" : "Confirm goal", `${p.objective.trim()}${contractBlock}${activationNote}`);
-      } catch {
-        confirmed = false;
+      if (autoAccept) {
+        confirmed = true;
+        liveCtx.ui.notify(`Draft auto-accepted (/glla autoaccept=on)${willActivate ? " — ACTIVATING now" : ""}: ${p.objective.trim().slice(0, 90)}`, "info");
+        appendLedger(liveCtx.cwd, "draft_autoaccepted", { kind: isListDraft ? "list" : "goal", objective: p.objective.trim().slice(0, 200) });
+      } else {
+        try {
+          confirmed = await liveCtx.ui.confirm(isListDraft ? "Confirm list item" : "Confirm goal", `${p.objective.trim()}${contractBlock}${activationNote}`);
+        } catch {
+          confirmed = false;
+        }
       }
       if (!confirmed) {
         return {
@@ -1663,7 +1697,7 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
           activateNextListItem(liveCtx);
           return { content: [{ type: "text", text: "Confirmed and activated (list was empty). Begin work now." }], details: {} };
         }
-        return { content: [{ type: "text", text: `Confirmed and queued (${listQueue().length} waiting). It activates when the current goal completes.` }], details: {} };
+        return { content: [{ type: "text", text: `Confirmed and added to the list (${listQueue().length} waiting). It activates when the current goal completes.` }], details: {} };
       }
       const goal = createGoal(full, liveCtx);
       setGoal(goal, liveCtx);
@@ -1692,6 +1726,8 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       branch: Type.Optional(Type.Boolean({ description: "branch=true: scratch-branch mode (clean git tree required)" })),
     }),
     async execute(_id, params, _signal, _onUpdate, execCtx) {
+      const foreign3 = foreignToolGuard(execCtx);
+      if (foreign3) return { content: [{ type: "text", text: foreign3 }], details: {} };
       const p = params as { target: string; measureCmd?: string; direction?: "min" | "max"; window?: number; max?: number; time?: number; tokens?: number; branch?: boolean };
       if (draftingTarget !== "loop") {
         return {
@@ -1739,17 +1775,27 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       }
       const window = p.window && p.window > 0 ? Math.floor(p.window) : 5;
       // v0.23.0: explicit max=0 = truly unbounded (no iteration cap).
-      const max = p.max !== undefined && Number.isFinite(p.max) && p.max >= 0 ? Math.floor(p.max) : 50;
+      // v0.23.8: metricless + no explicit max = UNBOUNDED here too — the
+      // drafter path was still defaulting to 50 after v0.23.6 flipped the
+      // CLI default.
+      const max = p.max !== undefined && Number.isFinite(p.max) && p.max >= 0 ? Math.floor(p.max) : metricless ? 0 : 50;
+      const autoAccept = loadSettings(ctx.cwd).autoAcceptDrafts === true;
       let confirmed = false;
-      try {
-        confirmed = await liveCtx.ui.confirm(
+      if (autoAccept) {
+        confirmed = true;
+        liveCtx.ui.notify(`Loop draft auto-accepted (/glla autoaccept=on): ${p.target.trim().slice(0, 90)}`, "info");
+        appendLedger(liveCtx.cwd, "draft_autoaccepted", { kind: "loop", target: p.target.trim().slice(0, 200), metricless });
+      } else {
+        try {
+          confirmed = await liveCtx.ui.confirm(
           "Confirm loop",
           metricless
             ? `Target: ${p.target.trim()}\n\nMeasure: NONE — metricless spec loop. There is NO plateau stop: the loop ends only at ${max > 0 ? `${max} iterations` : "NO iteration cap"}${typeof p.time === "number" && p.time > 0 ? ` · Time bound: ${p.time}h` : ""}${typeof p.tokens === "number" && p.tokens > 0 ? ` · Token bound: ${p.tokens.toLocaleString()}` : ""} · /loop stop.${p.branch ? "\nbranch mode: scratch branch, every iteration committed (clean tree required)" : ""}\n\nEvery iteration must make ONE real, inspectable change — cosmetic churn is the known failure mode (doorknob-polishing). Start it?`
             : `Target: ${p.target.trim()}\n\nMeasure: ${p.measureCmd}\nTest-run output: ${rawOutput.slice(0, 200)}\nParsed number: ${parsed} (${p.direction === "min" ? "lower is better" : "higher is better"})\n\nPlateau stop: ${window} non-improving iterations · Cap: ${max > 0 ? `${max} iterations` : "none (unbounded)"}${typeof p.time === "number" && p.time > 0 ? ` · Time bound: ${p.time}h` : ""}${typeof p.tokens === "number" && p.tokens > 0 ? ` · Token bound: ${p.tokens.toLocaleString()}` : ""}${p.branch ? "\nbranch mode: scratch branch (clean tree required)" : ""}\n\nThe loop never completes — it runs until one of these bounds, plateau, or /loop stop. Start it?`,
-        );
-      } catch {
-        confirmed = false;
+          );
+        } catch {
+          confirmed = false;
+        }
       }
       if (!confirmed) {
         return {
@@ -1788,6 +1834,8 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       rationale: Type.String({ description: "Why the current spec no longer captures 'better' — shown to the user in the Confirm dialog" }),
     }),
     async execute(_id, params, _signal, _onUpdate, execCtx) {
+      const foreign4 = foreignToolGuard(execCtx);
+      if (foreign4) return { content: [{ type: "text", text: foreign4 }], details: {} };
       const p = params as { target?: string; measureCmd?: string; rationale: string };
       const liveCtx = (execCtx as ExtensionContext | undefined) ?? ctx;
       const loop = state.loop;
@@ -1852,12 +1900,14 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
 
   pi.registerTool(defineTool({
     name: "list_add",
-    label: "Add to queue",
-    description: "Add one or many objectives to the /list list (loop 2). Use when the user asks to queue work — 'add these to my list', 'queue these 10 things', 'put this on the backlog'. Each item becomes an audited goal; per-item 'Done when:' clauses are honored. The first queued item activates automatically when nothing is running. The list is UNBOUNDED — hundreds of small items are fine; propose them all.",
+    label: "Add to list",
+    description: "Add one or many objectives to the /list list (loop 2). Use when the user asks to add work — 'add these to my list', 'queue these 10 things', 'put this on the backlog'. The list is a POOL, not a FIFO: order is the default, not the law — any item can be activated next. Each item becomes an audited goal; per-item 'Done when:' clauses are honored. The first item activates automatically when nothing is running. The list is UNBOUNDED — hundreds of small items are fine; propose them all.",
     parameters: Type.Object({
-      items: Type.Array(Type.String(), { description: "Objectives to enqueue — no count limit; large plans belong in ONE call." }),
+      items: Type.Array(Type.String(), { description: "Objectives to add — no count limit; large plans belong in ONE call." }),
     }),
     async execute(_id, params, _signal, _onUpdate, execCtx) {
+      const foreign5 = foreignToolGuard(execCtx);
+      if (foreign5) return { content: [{ type: "text", text: foreign5 }], details: {} };
       const p = params as { items: string[] };
       if (listMutationBlocked(draftingTarget)) {
         return { content: [{ type: "text", text: LIST_DRAFTING_BLOCK_MESSAGE }], details: {} };
@@ -1873,7 +1923,7 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
         content: [{
           type: "text",
           text: wasIdle
-            ? `${n} item(s) queued; the first is now active. Work it normally and call complete_goal when done — the next item activates automatically.`
+            ? `${n} item(s) added; the first is now active. Work it normally and call complete_goal when done — the next item activates automatically.`
             : `${n} item(s) queued (${listQueue().length} waiting behind the active goal).`,
         }],
         details: {},
@@ -1889,6 +1939,8 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       n: Type.Number({ description: "1-based position in the queue (1 = head)" }),
     }),
     async execute(_id, params, _signal, _onUpdate, execCtx) {
+      const foreign6 = foreignToolGuard(execCtx);
+      if (foreign6) return { content: [{ type: "text", text: foreign6 }], details: {} };
       const p = params as { n: number };
       if (listMutationBlocked(draftingTarget)) {
         return { content: [{ type: "text", text: LIST_DRAFTING_BLOCK_MESSAGE }], details: {} };
@@ -1962,11 +2014,18 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
         const subs = (t.subtasks ?? []).map((s, j) => `   ${i + 1}.${j + 1} ${s}`).join("\n");
         return `${i + 1}. ${t.title}` + (subs ? `\n${subs}` : "");
       }).join("\n");
+      const autoAcceptTasks = loadSettings(ctx.cwd).autoAcceptDrafts === true;
       let confirmed = false;
-      try {
-        confirmed = await liveCtx.ui.confirm("Confirm task list", preview);
-      } catch {
-        confirmed = false;
+      if (autoAcceptTasks) {
+        confirmed = true;
+        liveCtx.ui.notify(`Task list auto-accepted (/glla autoaccept=on): ${p.tasks.length} tasks.`, "info");
+        appendLedger(liveCtx.cwd, "draft_autoaccepted", { kind: "tasks", count: p.tasks.length });
+      } else {
+        try {
+          confirmed = await liveCtx.ui.confirm("Confirm task list", preview);
+        } catch {
+          confirmed = false;
+        }
       }
       if (!confirmed) {
         return { content: [{ type: "text", text: "Task list rejected by the user. Adjust and propose again." }], details: {} };
@@ -2001,6 +2060,10 @@ interface Settings {
   /** on → restored goals/loops/lists auto-resume even in fresh sessions
    * (unattended rigs). Default off: restore holds until /goal resume. */
   autoResume?: boolean;
+  /** on → propose_* drafts activate WITHOUT the Confirm dialog and the
+   * interview floor is skipped — the seed carries the intent (unattended
+   * rigs). Default off: nothing activates before the user confirms. */
+  autoAcceptDrafts?: boolean;
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -2045,7 +2108,7 @@ function settingsProvenance(cwd: string): Record<keyof Settings, { value: unknow
   const glob = readSettingsFile(globalSettingsPath());
   const effective = loadSettings(cwd);
   const out: Record<string, { value: unknown; source: "project" | "global" | "default" }> = {};
-  const keys: Array<keyof Settings> = ["auditorModel", "auditorThinkingLevel", "notifyCmd", "tokenLimit", "wedgeAlertMinutes", "autoResume"];
+  const keys: Array<keyof Settings> = ["auditorModel", "auditorThinkingLevel", "notifyCmd", "tokenLimit", "wedgeAlertMinutes", "autoResume", "autoAcceptDrafts"];
   for (const k of keys) {
     if ((proj as Record<string, unknown>)[k] !== undefined) out[k] = { value: (proj as any)[k], source: "project" };
     else if ((glob as Record<string, unknown>)[k] !== undefined) out[k] = { value: (glob as any)[k], source: "global" };
@@ -2215,6 +2278,7 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
         fmt("notifyCmd", "notify"),
         fmt("tokenLimit", "tokenLimit"),
         fmt("autoResume", "autoResume"),
+        fmt("autoAcceptDrafts", "autoAccept"),
         `\nglobal:  ${globalSettingsPath()}`,
         `project: ${projectSettingsPath(ctx.cwd)}`,
         `Set with: /glla key=value (global) · /glla project key=value (project override)`,
@@ -2275,6 +2339,17 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
         changed = true;
       } else {
         ctx.ui.notify(`autoresume must be on or off, got: ${value}`, "warning");
+      }
+    } else if (key === "autoaccept") {
+      if (["on", "true", "1", "yes"].includes(value)) {
+        patch.autoAcceptDrafts = true;
+        changed = true;
+        ctx.ui.notify("autoaccept=on: drafts will ACTIVATE without the Confirm dialog (the interview floor is skipped too — the seed is the intent). /glla autoaccept=off restores the gate.", "warning");
+      } else if (["off", "false", "0", "no", "unset"].includes(value)) {
+        patch.autoAcceptDrafts = undefined;
+        changed = true;
+      } else {
+        ctx.ui.notify(`autoaccept must be on or off, got: ${value}`, "warning");
       }
     } else if (key === "thinking" || key === "auditorthinkinglevel") {
       if (["off", "minimal", "low", "medium", "high", "xhigh"].includes(value)) {
@@ -2407,6 +2482,7 @@ export default function (pi: ExtensionAPI): void {
       ["notify=", "desktop push command: /glla notify='notify-send pi \"$1\"'"],
       ["tokenlimit=", "per-goal token budget (0 = off): /glla tokenlimit=2000000"],
       ["autoresume=", "on: auto-resume held goals/loops in fresh sessions"],
+      ["autoaccept=", "on: drafts activate without the Confirm dialog (unattended rigs)"],
       ["project", "write a project override: /glla project key=value"],
     ]),
     handler: settingsHandler,
@@ -2414,7 +2490,7 @@ export default function (pi: ExtensionAPI): void {
   pi.registerCommand("list", {
     description: "Loop 2: the list of audited goals — order is the default, not the law. /list <describe tasks or name a plan file> (dumps get shaped into items, files import, 'Done when:' adds directly) | /list show | /list resume | /list next [n] | /list remove <n> | /list clear",
     getArgumentCompletions: completions([
-      ["show", "display the queued items"],
+      ["show", "display the waiting items"],
       ["resume", "resume the paused list item (the list's head)"],
       ["next", "activate the next item (or /list next <n> for position n)"],
       ["remove", "remove an item: /list remove <n>"],
@@ -2506,14 +2582,14 @@ export default function (pi: ExtensionAPI): void {
         // v0.22.7: name WHAT is held — a list head resumes through /list.
         const isListItem = state.goal.policy === "list";
         const resumeCmd = isListItem ? "/list resume" : "/goal resume";
-        const resumeHint = `${resumeCmd} to continue${queued > 0 ? ` (+${queued} queued in the list)` : ""} · /glla autoresume=on to auto-resume in this project`;
+        const resumeHint = `${resumeCmd} to continue${queued > 0 ? ` (+${queued} waiting in the list)` : ""} · /glla autoresume=on to auto-resume in this project`;
         updateGoal({
           status: "paused",
           pauseReason: "restored in a fresh session — no work started",
           pauseSuggestedAction: resumeHint,
         }, ctx);
         ctx.ui.notify(
-          `${isListItem ? "List item" : "Goal"} held on restore [${state.goal.id}]: ${state.goal.objective.slice(0, 70)}${queued > 0 ? ` (+${queued} queued in the list)` : ""} — ${resumeCmd} to continue.`,
+          `${isListItem ? "List item" : "Goal"} held on restore [${state.goal.id}]: ${state.goal.objective.slice(0, 70)}${queued > 0 ? ` (+${queued} waiting in the list)` : ""} — ${resumeCmd} to continue.`,
           "info",
         );
       }

@@ -44,7 +44,7 @@ Four top-level commands, that's all:
 /list fix the login bug, add dark mode, write docs   # dump it — the agent shapes it into items, one Confirm
 /list plan.md                      # file detected → bulk import, one Confirm (sisyphus/Ralph style)
 /list <paste a checklist>          # multi-line paste → same batch flow
-/list "fix the flaky test. Done when: npm test green"   # explicit contract → queues directly, no interview
+/list "fix the flaky test. Done when: npm test green"   # explicit contract → added directly, no interview
 /list                              # show the list (add/import are optional no-op aliases — detection routes everything)
 
 (Or just say it: "queue these 10 things…" — the agent manages the list too.)
@@ -53,10 +53,10 @@ Four top-level commands, that's all:
 `/list next <n>` or the agent's `list_activate` tool picks any item — with
 subagents, what gets worked next is a choice, not a position. Numbering always
 matches `/list show`.
-/list                              # show active + queue
+/list                              # show active + waiting items
 /list next                         # skip current, activate next
-/list remove <n>                   # drop item n from the queue
-/list clear                        # empty the queue
+/list remove <n>                   # drop item n from the list
+/list clear                        # empty the list
 /loop                              # draft the loop (agent grills; measure is test-run before you confirm)
 /loop start "keep polishing the UI"                          # infinite metricless loop (v0.23.6): no plateau, no cap — ends at time=/tokens= or /loop stop
 /loop start "reduce TODOs" measure="grep -c TODO src.txt | head -1" direction=min
@@ -91,7 +91,7 @@ sisyphus-style plan file (checklists, bullets, numbered, plain lines) imports
 as-is — headings become nothing, items become goals. And the drafter itself
 batches: asking for "these 50 tasks" in a `/list` drafting session produces
 ONE confirmed batch, not 50 dialogs.
-Note: every queue item is audited individually, so at hundreds of items the
+Note: every list item is audited individually, so at hundreds of items the
 audit cost per item is the thing to think about.
 
 **Drafting is the default for long-running things.** `/goal` and
@@ -144,7 +144,7 @@ redirect you to `/goal`.
 | Loop | Command | Status |
 |---|---|---|
 | 1. Single ordered goal | `/goal "<objective>"` | **shipped v0.1.0** |
-| 2. Queue of goals | `/list [show\|next\|remove\|clear]` | **shipped v0.2.0** |
+| 2. List of goals (a pool, not a FIFO) | `/list [show\|next\|remove\|clear]` | **shipped v0.2.0** |
 | 3. Metric-driven process loop | `/loop start\|status\|stop` | **shipped v0.3.0** |
 
 Each loop is a different policy class on the same status machine.
@@ -186,6 +186,8 @@ No external watchdog plugin needed.
 /glla tokenlimit=10000000            # per-goal token budget (default: off) → GLOBAL
 /glla tokenlimit=0                   # explicitly no cap (the default)
 /glla wedgealert=30                  # hung-command alert minutes (default: 30, 0 = off)
+/glla autoresume=on                  # held goals/loops auto-resume in fresh sessions (unattended rigs)
+/glla autoaccept=on                  # drafts ACTIVATE without the Confirm dialog (unattended rigs)
 /glla project tokenlimit=500         # rare per-project override
 ```
 
