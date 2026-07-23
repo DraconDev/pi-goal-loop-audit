@@ -72,8 +72,23 @@ export const HEARTBEAT_MAX_NUDGES = 3;
  * activity for this long is almost always a hung unbounded command
  * (test suite / dev server) holding the whole goal hostage. The
  * turn-based watchdogs are blind to it (it's ONE long turn); only the
- * wall clock sees it. 0 in settings = off. */
-export const WEDGE_ALERT_DEFAULT_MINUTES = 45;
+ * wall clock sees it. 0 in settings = off.
+ * v0.23.3: 45 → 30. The alert is notification-only, so a false positive
+ * costs one notification while a false negative costs hours — that
+ * asymmetry argues tight. (pi-goal-x, the cautionary tale, had NO wall
+ * clock at all: a wedged session was silent forever.) */
+export const WEDGE_ALERT_DEFAULT_MINUTES = 30;
+/** v0.23.3: hard cap on one measure command. An unbounded measure is the
+ * same wedge shape as an unbounded test suite — it freezes the loop tick
+ * forever. Timeout → measure failure (null) → stall path → plateau stop,
+ * never a silent hang. Matches pi-loop-mode's --check-timeout default. */
+export const MEASURE_TIMEOUT_MS = 10 * 60_000;
+/** v0.23.3: auditor inactivity abort. The auditor legitimately runs the
+ * project's own verification (test suites!), so the bound is on
+ * INACTIVITY (no session events at all), not wall time. An auditor with
+ * no events for this long is wedged — abort and report an error, never
+ * disapprove, never hang the completion gate forever. */
+export const AUDITOR_STALL_MS = 10 * 60_000;
 
 export interface WedgeInput {
   /** A goal is active (autoContinue) or a loop is running. */
