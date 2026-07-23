@@ -2149,7 +2149,7 @@ async function openSettingsUI(ctx: ExtensionContext): Promise<void> {
           `Auditor thinking — ${show("auditorThinkingLevel", "(session, floor high)")}`,
           `Notify command — ${show("notifyCmd", "(off)")}`,
           `Token limit per goal — ${show("tokenLimit", "(off)")}`,
-          `Wedge alert minutes — ${show("wedgeAlertMinutes", `(${WEDGE_ALERT_DEFAULT_MINUTES}m default)`)`,
+          `Wedge alert minutes — ${show("wedgeAlertMinutes", `(${WEDGE_ALERT_DEFAULT_MINUTES}m default)`)}`,
           "Done",
         ],
       );
@@ -2197,6 +2197,7 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
   //   /glla thinking=high        write to GLOBAL config
   //   /glla notify='cmd $1'      write to GLOBAL config
   //   /glla tokenlimit=2000000   write to GLOBAL config
+  //   /glla wedgealert=30         hung-command alert minutes (0=off, unset=45)
   //   /glla project model=...    write to PROJECT override (rare)
   //   /glla model=unset          remove key (from global; project model=unset for project)
   const trimmed = args.trim();
