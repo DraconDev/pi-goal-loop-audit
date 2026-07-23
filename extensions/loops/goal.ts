@@ -55,6 +55,7 @@ import {
   piGlaDir,
   normalizeDraftContract,
   draftContractItemCount,
+  extractVerificationContract,
   readState,
   renderGoalMarkdown,
   shouldAutoResumeOnSessionStart,
@@ -352,36 +353,6 @@ function createGoal(objective: string, ctx: ExtensionContext, policy: "goal" | "
     updatedAt: nowIso(),
   };
   return goal;
-}
-
-function extractVerificationContract(raw: string): { objective: string; verificationContract: string } {
-  // Line-based first: a marker at line start begins the contract block.
-  const lines = raw.split("\n");
-  let mode: "obj" | "verify" = "obj";
-  const objParts: string[] = [];
-  const verifyParts: string[] = [];
-  for (const line of lines) {
-    const lower = line.toLowerCase();
-    if (lower.match(/^\s*(?:done when|verify|verified when|verification|done):/)) {
-      mode = "verify";
-    }
-    if (mode === "obj") objParts.push(line);
-    else verifyParts.push(line);
-  }
-  let objective = objParts.join("\n").trim();
-  let verificationContract = verifyParts.join("\n").trim();
-
-  // Inline fallback: users write one-liners like
-  //   "Create x.txt. Done when: grep -q ok x.txt"
-  // where the marker is mid-line. Split at the first inline marker.
-  if (!verificationContract) {
-    const m = raw.match(/^(.*?)(?:\.|;)??\s+(done when|verified when|verify|verification)\s*:\s*(.+)$/is);
-    if (m) {
-      objective = (m[1] ?? "").trim().replace(/[.;]\s*$/, "");
-      verificationContract = (m[3] ?? "").trim();
-    }
-  }
-  return { objective, verificationContract };
 }
 
 function persistState(ctx: ExtensionContext): void {

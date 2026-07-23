@@ -300,7 +300,10 @@ export interface ListItem {
 export function goalArgsNeedDrafting(args: string): boolean {
   const t = args.trim();
   if (!t) return false; // no-args is already the drafting path
-  return !/\bdone\s+when\s*:/i.test(t);
+  // v0.23.7: any "done when" phrase counts — requiring the colon to
+  // immediately follow made "Done when ALL of the following are true:"
+  // route to the interview even though the user wrote a contract.
+  return !/\bdone\s+when\b/i.test(t);
 }
 
 /**
@@ -626,4 +629,44 @@ export function normalizeDraftContract(raw: string): string {
 /** Count the numbered checklist items in a normalized contract. */
 export function draftContractItemCount(normalized: string): number {
   return normalized.split("\n").filter((l) => /^\d+\.\s/.test(l)).length;
+}
+
+/**
+ * Split raw objective text into { objective, verificationContract } at the
+ * first "Done when…:"-family marker (line-start preferred, inline fallback
+ * for one-liners). v0.23.7: the marker family accepts ANY text between the
+ * keyword and the colon ("Done when ALL of the following are true:") —
+ * the shield's contractItems already drops such introducer lines
+ * (v0.23.4), and goalArgsNeedDrafting recognizes the same phrase, so the
+ * three "done when" parsers can no longer drift apart. Lives in the pure
+ * module so tests exercise THIS function, not a copy (the pre-0.23.7 test
+ * re-implemented it and silently went stale).
+ */
+export function extractVerificationContract(raw: string): { objective: string; verificationContract: string } {
+  // Line-based first: a marker at line start begins the contract block.
+  const lines = raw.split("\n");
+  let mode: "obj" | "verify" = "obj";
+  const objParts: string[] = [];
+  const verifyParts: string[] = [];
+  for (const line of lines) {
+    if (line.match(/^\s*(?:done when|verified when|verify|verification|done)\b[^:]*:/i)) {
+      mode = "verify";
+    }
+    if (mode === "obj") objParts.push(line);
+    else verifyParts.push(line);
+  }
+  let objective = objParts.join("\n").trim();
+  let verificationContract = verifyParts.join("\n").trim();
+
+  // Inline fallback: users write one-liners like
+  //   "Create x.txt. Done when: grep -q ok x.txt"
+  // where the marker is mid-line. Split at the first inline marker.
+  if (!verificationContract) {
+    const m = raw.match(/^(.*?)(?:\.|;)??\s+(?:done when|verified when|verify|verification)\b[^:]*:\s*(.+)$/is);
+    if (m) {
+      objective = (m[1] ?? "").trim().replace(/[.;]\s*$/, "");
+      verificationContract = (m[2] ?? "").trim();
+    }
+  }
+  return { objective, verificationContract };
 }
