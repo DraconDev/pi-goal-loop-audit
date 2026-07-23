@@ -53,6 +53,8 @@ import {
   newGoalId,
   nowIso,
   piGlaDir,
+  normalizeDraftContract,
+  draftContractItemCount,
   readState,
   renderGoalMarkdown,
   shouldAutoResumeOnSessionStart,
@@ -1630,8 +1632,10 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
         }
         return { content: [{ type: "text", text: `${n} items confirmed and queued (${listQueue().length} waiting).` }], details: {} };
       }
-      const contractBlock = p.verificationContract?.trim()
-        ? `\n\nDone when:\n${p.verificationContract.trim()}`
+      const normContract = p.verificationContract?.trim() ? normalizeDraftContract(p.verificationContract) : "";
+      const checkCount = normContract ? draftContractItemCount(normContract) : 0;
+      const contractBlock = normContract
+        ? `\n\nDone when${checkCount > 0 ? ` — ${checkCount} check${checkCount === 1 ? "" : "s"}` : ""}:\n${normContract}`
         : "\n\n(No verification contract — the auditor will infer done-criteria from the objective. Consider adding one.)";
       // v0.22.6: a list draft that will activate immediately must SAY so in
       // the Confirm dialog — "I started a list and ended up with a running
@@ -1657,7 +1661,7 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       }
       const confirmedTarget = draftingTarget;
       draftingTarget = null;
-      const full = p.objective.trim() + (p.verificationContract?.trim() ? `\nDone when:\n${p.verificationContract.trim()}` : "");
+      const full = p.objective.trim() + (normContract ? `\nDone when:\n${normContract}` : "");
       // List drafting: the confirmed contract goes into the QUEUE, not active.
       if (confirmedTarget === "list") {
         const extracted = extractVerificationContract(full);

@@ -593,3 +593,37 @@ export function shouldAutoResumeOnSessionStart(reason: string | undefined, autoR
   if (autoResume === true) return true;
   return reason === "resume" || reason === "reload" || reason === "fork";
 }
+
+/**
+ * v0.23.5: normalize a drafter-supplied verification contract for the
+ * Confirm dialog AND for storage. Three cleanups, all mechanical:
+ *  1. Drop bare introducer lines ("Done when:", "Done when ALL of the
+ *     following are true:") — the dialog adds its own "Done when" header;
+ *     a model-supplied one renders doubled (field-observed) and pollutes
+ *     the shield's item list.
+ *  2. Strip a glued "Done when: " prefix on a content line.
+ *  3. Renumber bullet/numbered lines sequentially ("1.", "2.", ...) so the
+ *     dialog reads as a checklist and reject-feedback can cite item
+ *     numbers. Non-bullet prose lines pass through untouched.
+ */
+export function normalizeDraftContract(raw: string): string {
+  const lines = raw
+    .trim()
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => !/^(?:done when|verified when|verify|verification)\b[^:]*:\s*$/i.test(l))
+    .map((l) => l.replace(/^(?:done when|verified when)\s*:\s+/i, ""))
+    .filter((l) => l.length > 0);
+  let n = 0;
+  return lines
+    .map((l) => {
+      const m = l.match(/^(?:[-*•]\s+|\d+[.)]\s+)(.+)$/);
+      return m ? `${++n}. ${m[1]}` : l;
+    })
+    .join("\n");
+}
+
+/** Count the numbered checklist items in a normalized contract. */
+export function draftContractItemCount(normalized: string): number {
+  return normalized.split("\n").filter((l) => /^\d+\.\s/.test(l)).length;
+}
