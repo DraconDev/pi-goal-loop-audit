@@ -68,6 +68,36 @@ export function humanMs(ms: number): string {
 export const HEARTBEAT_INTERVAL_MS = 15_000;
 export const HEARTBEAT_STALL_MS = 60_000;
 export const HEARTBEAT_MAX_NUDGES = 3;
+/** v0.23.2: default wall-clock wedge threshold — a busy session with no
+ * activity for this long is almost always a hung unbounded command
+ * (test suite / dev server) holding the whole goal hostage. The
+ * turn-based watchdogs are blind to it (it's ONE long turn); only the
+ * wall clock sees it. 0 in settings = off. */
+export const WEDGE_ALERT_DEFAULT_MINUTES = 45;
+
+export interface WedgeInput {
+  /** A goal is active (autoContinue) or a loop is running. */
+  supervising: boolean;
+  /** Session is BUSY (mid-turn). An idle quiet session is the
+   *  heartbeat's job, not the wedge alert's. */
+  sessionBusy: boolean;
+  /** Milliseconds since the last observed agent activity. */
+  silentMs: number;
+  /** Milliseconds since the last wedge alert fired (throttle). */
+  msSinceLastAlert: number;
+  /** Threshold in ms; 0 disables the alert entirely. */
+  thresholdMs: number;
+}
+
+/** Should the wedge alert fire right now? Alerts at most once per
+ *  threshold interval while the wedge persists; any activity re-arms. */
+export function shouldWedgeAlert(input: WedgeInput): boolean {
+  if (!input.supervising) return false;
+  if (!input.sessionBusy) return false;
+  if (input.thresholdMs <= 0) return false;
+  if (input.silentMs < input.thresholdMs) return false;
+  return input.msSinceLastAlert >= input.thresholdMs;
+}
 
 export interface HeartbeatInput {
   /** A goal is active (autoContinue) or a loop is running. */

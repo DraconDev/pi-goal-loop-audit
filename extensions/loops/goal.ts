@@ -77,6 +77,8 @@ import {
   HEARTBEAT_MAX_NUDGES,
   HEARTBEAT_STALL_MS,
   shouldHeartbeatRefire,
+  WEDGE_ALERT_DEFAULT_MINUTES,
+  shouldWedgeAlert,
 } from "../goal-loop-backoff.js";
 
 // =================================================================
@@ -122,6 +124,7 @@ const countedLoopTokenMessages = new Set<string>();
 
 // Heartbeat self-watchdog state: liveness is the loop's own job.
 let lastActivityAt = Date.now();
+let lastWedgeAlertAt = 0;
 let heartbeatNudges = 0;
 let heartbeatTimer: NodeJS.Timeout | null = null;
 
@@ -180,6 +183,27 @@ function heartbeatTick(): void {
     msSinceActivity: Date.now() - lastActivityAt,
     stallMs: HEARTBEAT_STALL_MS,
   });
+  // Wedge alert (v0.23.2): session BUSY but silent for the threshold —
+  // the classic hung-command case (a test suite that never exits holds
+  // the entire goal hostage; field-observed at 5,056s and 6,800s on the
+  // same wedged tool call). Independent of the refire path, which only
+  // watches idle sessions.
+  const wedgeMinutes = loadSettings(ctx.cwd).wedgeAlertMinutes ?? WEDGE_ALERT_DEFAULT_MINUTES;
+  if (
+    shouldWedgeAlert({
+      supervising: isSupervising(),
+      sessionBusy: !sessionIdle,
+      silentMs: Date.now() - lastActivityAt,
+      msSinceLastAlert: Date.now() - lastWedgeAlertAt,
+      thresholdMs: wedgeMinutes * 60_000,
+    })
+  ) {
+    lastWedgeAlertAt = Date.now();
+    const msg = `Goal appears wedged: no activity for ${Math.round((Date.now() - lastActivityAt) / 60_000)}m while the session is busy — likely a hung command (test/build/dev server without a timeout). Check the session; Esc kills a stuck tool call.`;
+    appendLedger(ctx.cwd, "wedge_alert", { silentMs: Date.now() - lastActivityAt });
+    ctx.ui.notify(msg, "warning");
+    notifyExternal(ctx, msg);
+  }
   if (!fire) return;
   noteActivity();
   appendLedger(ctx.cwd, "heartbeat_refire", { nudgesSoFar: heartbeatNudges });
@@ -1976,6 +2000,9 @@ interface Settings {
   /** Per-goal token budget; crossing it pauses the goal. Off by default
    * (opt-in guard, v0.12.0): unset/0 = no budget. */
   tokenLimit?: number;
+  /** v0.23.2: minutes of busy-but-silent before the wedge alert fires
+   * (hung-command detector). Unset = 45; 0 = off. */
+  wedgeAlertMinutes?: number;
   /** on → restored goals/loops/lists auto-resume even in fresh sessions
    * (unattended rigs). Default off: restore holds until /goal resume. */
   autoResume?: boolean;
@@ -2023,7 +2050,7 @@ function settingsProvenance(cwd: string): Record<keyof Settings, { value: unknow
   const glob = readSettingsFile(globalSettingsPath());
   const effective = loadSettings(cwd);
   const out: Record<string, { value: unknown; source: "project" | "global" | "default" }> = {};
-  const keys: Array<keyof Settings> = ["auditorModel", "auditorThinkingLevel", "notifyCmd", "tokenLimit", "autoResume"];
+  const keys: Array<keyof Settings> = ["auditorModel", "auditorThinkingLevel", "notifyCmd", "tokenLimit", "wedgeAlertMinutes", "autoResume"];
   for (const k of keys) {
     if ((proj as Record<string, unknown>)[k] !== undefined) out[k] = { value: (proj as any)[k], source: "project" };
     else if ((glob as Record<string, unknown>)[k] !== undefined) out[k] = { value: (glob as any)[k], source: "global" };
@@ -2122,6 +2149,7 @@ async function openSettingsUI(ctx: ExtensionContext): Promise<void> {
           `Auditor thinking — ${show("auditorThinkingLevel", "(session, floor high)")}`,
           `Notify command — ${show("notifyCmd", "(off)")}`,
           `Token limit per goal — ${show("tokenLimit", "(off)")}`,
+          `Wedge alert minutes — ${show("wedgeAlertMinutes", `(${WEDGE_ALERT_DEFAULT_MINUTES}m default)`)`,
           "Done",
         ],
       );
@@ -2145,6 +2173,14 @@ async function openSettingsUI(ctx: ExtensionContext): Promise<void> {
           const n = Number.parseInt(v.trim(), 10);
           if (Number.isFinite(n) && n >= 0) saveSettings("global", ctx.cwd, { tokenLimit: n });
           else if (!v.trim()) saveSettings("global", ctx.cwd, { tokenLimit: undefined });
+          else ctx.ui.notify(`Not a non-negative integer: ${v}`, "warning");
+        }
+      } else if (choice.startsWith("Wedge alert")) {
+        const v = await ctx.ui.input("Wedge alert threshold (minutes)", "non-negative integer; 0 = off, empty = default 45");
+        if (v !== undefined) {
+          const n = Number.parseInt(v.trim(), 10);
+          if (Number.isFinite(n) && n >= 0) saveSettings("global", ctx.cwd, { wedgeAlertMinutes: n });
+          else if (!v.trim()) saveSettings("global", ctx.cwd, { wedgeAlertMinutes: undefined });
           else ctx.ui.notify(`Not a non-negative integer: ${v}`, "warning");
         }
       }
@@ -2220,6 +2256,19 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
         changed = true;
       } else {
         ctx.ui.notify(`tokenlimit must be a positive integer, got: ${value}`, "warning");
+      }
+    } else if (key === "wedgealert") {
+      if (value === "unset") {
+        patch.wedgeAlertMinutes = undefined;
+        changed = true;
+      } else {
+        const n = Number.parseInt(value, 10);
+        if (Number.isFinite(n) && n >= 0) {
+          patch.wedgeAlertMinutes = n; // 0 = off; unset = default 45
+          changed = true;
+        } else {
+          ctx.ui.notify(`wedgealert must be a non-negative integer (minutes, 0 = off), got: ${value}`, "warning");
+        }
       }
     } else if (key === "autoresume") {
       if (["on", "true", "1", "yes"].includes(value)) {

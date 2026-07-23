@@ -13,6 +13,7 @@ import {
   HEARTBEAT_MAX_NUDGES,
   HEARTBEAT_STALL_MS,
   shouldHeartbeatRefire,
+  shouldWedgeAlert,
 } from "../extensions/goal-loop-backoff.ts";
 
 // ---- shouldHeartbeatRefire ----
@@ -83,4 +84,48 @@ test("zero-tool turn increments the nudge count", () => {
 test("tool-using turn resets the count", () => {
   assert.equal(accountTurnForNudges(1, 2), 0);
   assert.equal(accountTurnForNudges(7, 0), 0);
+});
+
+// ---- v0.23.2: wedge alert (busy-but-silent = hung command) ----
+
+test("shouldWedgeAlert: fires when supervising + busy + silent past threshold", () => {
+  assert.equal(shouldWedgeAlert({
+    supervising: true, sessionBusy: true,
+    silentMs: 46 * 60_000, msSinceLastAlert: 46 * 60_000, thresholdMs: 45 * 60_000,
+  }), true);
+});
+
+test("shouldWedgeAlert: silent below threshold does not fire", () => {
+  assert.equal(shouldWedgeAlert({
+    supervising: true, sessionBusy: true,
+    silentMs: 10 * 60_000, msSinceLastAlert: 100 * 60_000, thresholdMs: 45 * 60_000,
+  }), false);
+});
+
+test("shouldWedgeAlert: idle session is the heartbeat's job, not ours", () => {
+  assert.equal(shouldWedgeAlert({
+    supervising: true, sessionBusy: false,
+    silentMs: 100 * 60_000, msSinceLastAlert: 100 * 60_000, thresholdMs: 45 * 60_000,
+  }), false);
+});
+
+test("shouldWedgeAlert: not supervising never fires", () => {
+  assert.equal(shouldWedgeAlert({
+    supervising: false, sessionBusy: true,
+    silentMs: 100 * 60_000, msSinceLastAlert: 100 * 60_000, thresholdMs: 45 * 60_000,
+  }), false);
+});
+
+test("shouldWedgeAlert: throttled to once per threshold interval", () => {
+  assert.equal(shouldWedgeAlert({
+    supervising: true, sessionBusy: true,
+    silentMs: 100 * 60_000, msSinceLastAlert: 5 * 60_000, thresholdMs: 45 * 60_000,
+  }), false);
+});
+
+test("shouldWedgeAlert: threshold 0 disables", () => {
+  assert.equal(shouldWedgeAlert({
+    supervising: true, sessionBusy: true,
+    silentMs: 100 * 60_000, msSinceLastAlert: 100 * 60_000, thresholdMs: 0,
+  }), false);
 });
