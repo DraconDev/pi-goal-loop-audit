@@ -26,6 +26,7 @@ Start your reply with exactly one line: `HYPOTHESIS: <what you will change and w
 Then make **ONE** small, concrete change that moves the metric in the right
 direction. Then stop.
 
+${INTERVENTION_NOTE}
 ${REGRESSION_NOTE}
 ${STRATEGY_NOTE}
 

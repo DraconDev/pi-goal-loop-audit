@@ -16,10 +16,13 @@ ${TARGET}
 
 ## Your job THIS turn
 
+${VARIANT_NOTE}
+
 Start your reply with exactly one line: `HYPOTHESIS: <what you will change and why it is real progress on the spec>`.
 Then make **ONE** concrete, inspectable change that advances the target.
 Then stop.
 
+${INTERVENTION_NOTE}
 ${REGRESSION_NOTE}
 ${STRATEGY_NOTE}
 
