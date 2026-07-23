@@ -368,6 +368,18 @@ export interface State {
   loop?: import("./goal-loop-forever.js").LoopState;
 }
 
+/** v0.24.2: count TRAILING consecutive disapprovals (the disapproval-cap
+ *  input). Shield-blocks (approved:true) and infra errors (neither flag)
+ *  break the streak — they are not verdicts on the work. */
+export function countTrailingDisapprovals(history: AuditVerdict[]): number {
+  let n = 0;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i]!.disapproved) n++;
+    else break;
+  }
+  return n;
+}
+
 /** Default per-goal token budget (v0.9.7): a runaway threshold, not a
  * "big goal" threshold — real research/feature goals legitimately burn 2-4M.
  * Loop 3 doesn't rely on this cap (it has max-iterations + plateau brakes). */
