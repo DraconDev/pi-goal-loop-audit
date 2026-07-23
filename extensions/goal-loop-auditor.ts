@@ -126,6 +126,8 @@ function buildGoalAuditorPrompt(goal: Goal, completionSummary: string | null | u
     "Return a concise audit report. The final line MUST be exactly one of:",
     "<approved/>",
     "<disapproved/>",
+    "<impossible>one-line reason</impossible>",
+    "Use <impossible> ONLY when the objective can NEVER be satisfied as stated — contradictory requirements, a premise that is factually wrong, or resources the agent can never obtain. Incomplete or shoddy work is <disapproved/>, not impossible.",
     "",
     "Goal markdown (full state):",
     "<goal>",
@@ -168,7 +170,7 @@ function buildGoalAuditorPrompt(goal: Goal, completionSummary: string | null | u
       ? ["4. Verify that the executor has satisfied every item in the <verification_contract>. If any item is missing or weakly addressed, disapprove."]
       : []),
     "5. Explain missing or weak evidence, especially scaffold-vs-final quality gaps.",
-    "6. End with exactly <approved/> only if the objective is truly complete; otherwise end with exactly <disapproved/>.",
+    "6. End with exactly <approved/> only if the objective is truly complete; <impossible>reason</impossible> if it can never be satisfied as stated; otherwise end with exactly <disapproved/>.",
     ...(goal.verificationContract?.trim()
       ? [
           "",
@@ -373,18 +375,19 @@ export async function runGoalCompletionAuditor(args: {
       };
     }
 
-    const lastAssistant = [...outputParts].reverse().find((t) => /<\/?(approved|disapproved)\/>/i.test(t)) ?? output;
-    const approved = /<approved\/>/i.test(lastAssistant);
-    const disapproved = /<disapproved\/>/i.test(lastAssistant);
+    const parsed = parseAuditorVerdict(outputParts.join("\n\n"));
+    const approved = parsed.approved;
+    const disapproved = parsed.disapproved;
+    const impossible = parsed.impossible;
 
-    if (!approved && !disapproved) {
+    if (!approved && !disapproved && !impossible) {
       return {
         approved: false,
         disapproved: false,
         output,
         model: modelLabel(model),
         thinkingLevel,
-        error: `Auditor produced no verdict marker (<approved/>/<disapproved/>)${streamError ? ` — stream error: ${streamError}` : ""}. Treating as an error, not a verdict.`,
+        error: `Auditor produced no verdict marker (<approved/>/<disapproved/>/<impossible>)${streamError ? ` — stream error: ${streamError}` : ""}. Treating as an error, not a verdict.`,
       };
     }
 
@@ -426,6 +429,8 @@ export async function runGoalCompletionAuditor(args: {
       return {
         approved,
         disapproved,
+        impossible,
+        impossibleReason: parsed.impossibleReason,
         output,
         model: modelLabel(model),
         thinkingLevel,
@@ -435,7 +440,7 @@ export async function runGoalCompletionAuditor(args: {
 
     progress.phase = "complete";
     emitProgress();
-    return { approved, disapproved, output, model: modelLabel(model), thinkingLevel };
+    return { approved, disapproved, impossible, impossibleReason: parsed.impossibleReason, output, model: modelLabel(model), thinkingLevel };
   } catch (err) {
     // v0.11.1 (audit critical): a runtime exception is INFRASTRUCTURE, never
     // a verdict. The three-way split identifies infra by `error &&

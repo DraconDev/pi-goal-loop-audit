@@ -1477,6 +1477,8 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
           at: nowIso(),
           approved: result.approved,
           disapproved: result.disapproved,
+          impossible: result.impossible,
+          impossibleReason: result.impossibleReason,
           model: result.model,
           thinkingLevel: result.thinkingLevel,
           report: result.output,
@@ -1519,6 +1521,30 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
         archiveCurrentGoal(ctx, "complete", `auditor ${result.model} approved`);
         notifyExternal(ctx, `Goal complete (auditor approved): ${objective.slice(0, 120)}`);
         return { content: [{ type: "text", text: `Goal approved by auditor ${result.model}.` }], details: {} };
+      }
+
+      // IMPOSSIBLE (v0.24.2, Claude-Code lesson): the auditor's escape hatch
+      // for goals that can NEVER be satisfied as stated. Not a disapproval —
+      // continuing would burn tokens on a provably unwinnable objective.
+      // Bounded and surfaced: the goal pauses and the user decides.
+      if (result.impossible) {
+        const reason = result.impossibleReason || "(no reason given)";
+        updateGoal({
+          status: "paused",
+          auditHistory: history,
+          pauseReason: `auditor verdict: IMPOSSIBLE — ${reason}`,
+          pauseSuggestedAction: "The auditor says this goal can never be satisfied as stated. /goal tweak the objective (or /goal cancel), then /goal resume.",
+        }, ctx);
+        ctx.ui.notify(`Auditor: goal IMPOSSIBLE — ${reason}. Goal paused; /goal tweak or /goal cancel, then /goal resume.`, "warning");
+        appendLedger(ctx.cwd, "goal_paused", { reason: `auditor impossible: ${reason}` });
+        notifyExternal(ctx, `Goal paused (auditor: impossible): ${reason.slice(0, 120)}`);
+        return {
+          content: [{
+            type: "text",
+            text: `The auditor's verdict is IMPOSSIBLE: ${reason}\n\nThis is not a disapproval — the auditor says the objective can never be satisfied as stated. The goal is now PAUSED. Do not call complete_goal again. Report the verdict to the user and suggest /goal tweak (narrow or correct the objective) or /goal cancel.`,
+          }],
+          details: {},
+        };
       }
 
       // THREE-WAY SPLIT (v0.9.9): infrastructure failure is NOT a verdict.
@@ -1567,6 +1593,30 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       const noContractHint = state.goal.verificationContract?.trim()
         ? ""
         : "\n\nNote: this goal has no verification contract, so the auditor inferred done-criteria from the objective text. For sharper verdicts, /goal tweak the objective to add a 'Done when: ...' clause.";
+      // v0.24.2 (Claude-Code lesson — their stop-hook blocks cap at 8): a
+      // goal the auditor can NEVER approve used to re-continue forever.
+      // auditCap consecutive disapprovals → pause + notify, bounded and
+      // surfaced like every other stop in this stack.
+      const auditCap = loadSettings(ctx.cwd).auditCap ?? 3;
+      const trailingDisapprovals = countTrailingDisapprovals(history);
+      if (auditCap > 0 && trailingDisapprovals >= auditCap) {
+        updateGoal({
+          status: "paused",
+          auditHistory: history,
+          pauseReason: `auditor disapproved ${trailingDisapprovals}× consecutively (cap ${auditCap})`,
+          pauseSuggestedAction: "Read the audit history (/goal status), fix the actual gap or /goal tweak the objective, then /goal resume. Raise the cap with /glla auditcap=N.",
+        }, ctx);
+        ctx.ui.notify(`Goal paused: auditor disapproved ${trailingDisapprovals}× consecutively (cap ${auditCap}). /goal status for the reports; /goal resume to continue.`, "warning");
+        appendLedger(ctx.cwd, "goal_paused", { reason: `disapproval cap: ${trailingDisapprovals} consecutive (cap ${auditCap})` });
+        notifyExternal(ctx, `Goal paused: ${trailingDisapprovals} consecutive auditor disapprovals`);
+        return {
+          content: [{
+            type: "text",
+            text: `The auditor has now disapproved ${trailingDisapprovals} times in a row (cap ${auditCap}). The goal is PAUSED — continuing to re-attempt without addressing the pattern wastes tokens. Latest report (first 800 chars):\n${result.output.slice(0, 800)}\n\nDo not call complete_goal again. Summarize the repeated objections for the user and ask how to proceed (/goal status shows all reports; /goal resume resumes).`,
+          }],
+          details: {},
+        };
+      }
       updateGoal({
         status: "active",
         auditHistory: history,
