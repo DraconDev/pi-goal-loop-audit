@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.23.3] — 2026-07-23
+
+### Changed
+
+- **Tight timings pass** (user instinct: pi-goal-x's super-long waits
+  sucked — audit confirmed goal-x has NO wall-clock bounds anywhere: a
+  wedged session there is silent forever). Comparative baseline:
+  pi-loop-mode bounds its check command (`--check-timeout`, default
+  600s); pi-tasks bounds sync waits (30s default / 600s max); goal-x
+  bounds nothing. Two of our three remaining unbounded waits are now
+  bounded, and the one alert default tightened.
+- **Wedge alert default 45m → 30m.** The alert is notification-only, so
+  a false positive costs one notification while a false negative costs
+  hours — that asymmetry argues tight.
+
+### Added
+
+- **Measure timeout (10m hard cap)** — `runMeasure` passed NO timeout to
+  `pi.exec`: a hung measure command (e.g. a test-based measure) froze the
+  loop tick forever, the exact darklord wedge shape one layer down.
+  Timeout → measure failure (null) → stall path → plateau stop; never a
+  silent hang. Matches loop-mode's 600s check-timeout ballpark.
+- **Auditor stall watchdog (10m inactivity → abort)** — the auditor
+  legitimately runs the project's own verification, so the bound is on
+  INACTIVITY (zero session events), not wall time. A wedged auditor
+  (dead stream, hung provider) previously held the completion gate
+  forever; now it aborts and returns an infrastructure ERROR (never a
+  disapproval, never an approval) naming the cause and the fix.
+- Regression-guard test pinning every timing bound to ≤ 30 minutes.
+
 ## [0.23.2] — 2026-07-23
 
 ### Added

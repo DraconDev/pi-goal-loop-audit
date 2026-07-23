@@ -184,7 +184,7 @@ No external watchdog plugin needed.
 /glla notify='cmd "$1"'              # push on complete/pause/stop → GLOBAL
 /glla tokenlimit=10000000            # per-goal token budget (default: off) → GLOBAL
 /glla tokenlimit=0                   # explicitly no cap (the default)
-/glla wedgealert=30                  # hung-command alert minutes (default: 45, 0 = off)
+/glla wedgealert=30                  # hung-command alert minutes (default: 30, 0 = off)
 /glla project tokenlimit=500         # rare per-project override
 ```
 
@@ -208,9 +208,14 @@ this cap — it has its own brakes
 The turn-based watchdogs can't see one failure shape: the session is busy
 but silent for a long stretch because ONE unbounded command (a test suite
 that never exits, a dev server) is holding the whole goal hostage. The
-heartbeat watches the wall clock: busy + no activity for 45 minutes →
+heartbeat watches the wall clock: busy + no activity for 30 minutes →
 in-session warning + your configured notify push, once per interval while
 it persists. Tune with `/glla wedgealert=<minutes>` (0 = off).
+
+Every other wait is bounded too: continuation retries are milliseconds,
+stuck backoff caps at 5 minutes then pauses, measure commands get a 10m
+hard timeout, and the auditor aborts after 10m with zero session activity
+(infrastructure error, never a verdict).
 
 ## Compatibility (what goes well, what conflicts)
 
