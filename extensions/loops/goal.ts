@@ -76,7 +76,6 @@ import { buildStatusText, buildWidgetLines, type AuditDisplayProgress } from "..
 import {
   applyMeasurement,
   applyMetriclessTick,
-  pushCapped,
   applyRefinement,
   loopBranchName,
   parseLoopStartArgs,
@@ -991,7 +990,7 @@ async function runGit(ctx: ExtensionContext, args: string[]): Promise<{ ok: bool
   }
 }
 
-function loopPrompt(loop: LoopState, regressionNote: string, strategyNote: string, boundsNote: string): string {
+function loopPrompt(loop: LoopState, regressionNote: string, strategyNote: string, boundsNote: string, interventionNote = "", variantNote = ""): string {
   // v0.23.0: metricless loops get their own prompt — no metric section,
   // anti-doorknob rules instead of anti-gaming rules.
   const metricless = !loop.measureCmd;
@@ -1016,7 +1015,9 @@ function loopPrompt(loop: LoopState, regressionNote: string, strategyNote: strin
     .replace(/\$\{PLATEAU_WINDOW\}/g, String(loop.plateauWindow))
     .replace(/\$\{REGRESSION_NOTE\}/g, regressionNote)
     .replace(/\$\{STRATEGY_NOTE\}/g, strategyNote)
-    .replace(/\$\{BOUNDS_NOTE\}/g, boundsNote);
+    .replace(/\$\{BOUNDS_NOTE\}/g, boundsNote)
+    .replace(/\$\{INTERVENTION_NOTE\}/g, interventionNote)
+    .replace(/\$\{VARIANT_NOTE\}/g, variantNote);
 }
 
 function scheduleLoopTick(ctx: ExtensionContext): void {
@@ -1069,10 +1070,18 @@ function sendLoopTurn(): void {
   } else if (bounds.length) {
     boundsNote = `\n- Arbitrary bounds: the loop also stops after ${bounds.join(" or ")}`;
   }
+  // v0.24.0: a stuck intervention REPLACES the pep talk — the rotating
+  // directive names why the loop is stuck and what rung of the ladder it's on.
+  const interventionNote = (loop.consecutiveStuck ?? 0) > 0 && loop.lastStuckReason
+    ? loopInterventionDirective(loop.consecutiveStuck!, loop.lastStuckReason, loop.recentTexts ?? [])
+    : "";
+  // v0.24.0: identical prompts invite identical answers — rotate the base
+  // instruction (metricless loops; metric loops already vary via values).
+  const variantNote = metricless ? continueVariant(loop.iteration) : "";
   try {
     extensionApi.sendMessage({
       customType: GOAL_EVENT_ENTRY,
-      content: loopPrompt(loop, regressionNote, strategyNote, boundsNote),
+      content: loopPrompt(loop, regressionNote, strategyNote, boundsNote, interventionNote, variantNote),
       display: false,
     }, { triggerTurn: true, deliverAs: "followUp" });
   } catch {
@@ -1092,10 +1101,40 @@ async function runLoopTick(ctx: ExtensionContext, event?: any): Promise<void> {
   // Hypothesis line (pi-autoresearch's good idea): the agent's stated intent
   // for the turn goes into the ledger, making loop history auditable.
   let hypothesis: string | undefined;
+  let lastAssistantText = "";
   if (event) {
     const last = [...(event.messages as any[])].reverse().find((m) => m.role === "assistant");
-    const text = last && Array.isArray(last.content) ? last.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n") : "";
-    hypothesis = text.match(/^HYPOTHESIS:\s*(.+)$/m)?.[1]?.trim().slice(0, 200);
+    lastAssistantText = last && Array.isArray(last.content) ? last.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n") : "";
+    hypothesis = lastAssistantText.match(/^HYPOTHESIS:\s*(.+)$/m)?.[1]?.trim().slice(0, 200);
+  }
+  // v0.24.0 anti-repetition: roll the behavior windows, then classify. The
+  // plateau stop watches the NUMBER; this watches the WORK — a metricless
+  // loop (no number) has no other defense against doorknob-polishing.
+  const toolsUsed = loop.toolsThisTurn ?? 0;
+  loop.toolsThisTurn = 0;
+  loop.toollessStreak = toolsUsed === 0 ? (loop.toollessStreak ?? 0) + 1 : 0;
+  const previousText = loop.recentTexts && loop.recentTexts.length > 0 ? loop.recentTexts[loop.recentTexts.length - 1] : undefined;
+  if (lastAssistantText) {
+    loop.recentPrints = pushRepetitionCapped(loop.recentPrints ?? [], textFingerprint(lastAssistantText), REPETITION.printWindow);
+    loop.recentTexts = pushRepetitionCapped(loop.recentTexts ?? [], lastAssistantText, REPETITION.textWindow);
+  }
+  const stuckReason = detectLoopStuck({
+    assistantText: lastAssistantText,
+    recentPrints: loop.recentPrints ?? [],
+    previousText,
+    recentToolResults: loop.recentToolResults ?? [],
+    toollessStreak: loop.toollessStreak ?? 0,
+  });
+  if (stuckReason) {
+    loop.consecutiveStuck = (loop.consecutiveStuck ?? 0) + 1;
+    loop.lastStuckReason = stuckReason;
+    appendLedger(ctx.cwd, "loop_stuck", { iteration: loop.iteration, reason: stuckReason, consecutive: loop.consecutiveStuck });
+    if (loop.consecutiveStuck === 1 || loop.consecutiveStuck >= REPETITION.hardResetAfter) {
+      ctx.ui.notify(`Loop stuck (${loop.consecutiveStuck}×): ${stuckReason}`, "warning");
+    }
+  } else {
+    loop.consecutiveStuck = 0;
+    loop.lastStuckReason = undefined;
   }
   const outcome = metricless ? applyMetriclessTick(loop, nowIso()) : applyMeasurement(loop, value, nowIso());
   persistState(ctx);
@@ -1105,6 +1144,7 @@ async function runLoopTick(ctx: ExtensionContext, event?: any): Promise<void> {
     best: loop.bestValue,
     stall: loop.stallCount,
     hypothesis,
+    stuck: stuckReason,
   });
   // branch=1 mode: commit improvements, hard-reset regressions — always and
   // only on the scratch branch. v0.23.0: a metricless loop has no regression
@@ -1119,6 +1159,18 @@ async function runLoopTick(ctx: ExtensionContext, event?: any): Promise<void> {
       appendLedger(ctx.cwd, "loop_git", { action: "reset", iteration: loop.iteration, ok: reset.ok });
     }
     persistState(ctx);
+  }
+  // v0.24.0: the top of the stuck ladder — bounded and surfaced, same
+  // philosophy as a plateau stop. The loop ends WITH the reason, not in silence.
+  if (outcome.kind !== "stop" && (loop.consecutiveStuck ?? 0) >= REPETITION.maxInterventions) {
+    loop.active = false;
+    loop.stopReason = `stuck — ${loop.lastStuckReason} (${loop.consecutiveStuck} consecutive interventions)`;
+    persistState(ctx);
+    await finishLoopGit(ctx, loop);
+    ctx.ui.notify(`Loop stopped: ${loop.stopReason}. ${loop.history.length} iterations recorded.`, "warning");
+    appendLedger(ctx.cwd, "loop_stopped", { reason: loop.stopReason, iterations: loop.iteration, best: loop.bestValue });
+    notifyExternal(ctx, `Loop stopped: ${loop.stopReason}`);
+    return;
   }
   if (outcome.kind === "stop") {
     await finishLoopGit(ctx, loop);
@@ -2537,6 +2589,18 @@ export default function (pi: ExtensionAPI): void {
   // v0.15.1: ask_user_question answers arrive as tool results, not chat
   // messages — count answered (non-cancelled) questionnaires as replies too.
   pi.on("tool_result", async (event: any) => {
+    // v0.24.0: roll loop tool-result fingerprints (same-tool-same-result
+    // detection) — recorded for ANY tool result while a loop is active.
+    if (isLoopActive()) {
+      const loop = state.loop!;
+      const out = event?.output ?? event?.result ?? event?.details ?? "";
+      const text = typeof out === "string" ? out : JSON.stringify(out) ?? "";
+      loop.recentToolResults = pushRepetitionCapped(
+        loop.recentToolResults ?? [],
+        { tool: String(event?.toolName ?? "?"), hash: textFingerprint(text), isError: Boolean(event?.isError ?? event?.error) },
+        REPETITION.toolWindow,
+      );
+    }
     if (draftingTarget === null) return;
     if (askUserQuestionAnswered(String(event?.toolName ?? ""), event?.details)) {
       draftingUserReplies++;
@@ -2724,5 +2788,9 @@ export default function (pi: ExtensionAPI): void {
   pi.on("tool_call", () => {
     toolCallsThisTurn++;
     noteActivity();
+    // v0.24.0: count loop-iteration tool calls (narration-only detection).
+    if (isLoopActive()) {
+      state.loop!.toolsThisTurn = (state.loop!.toolsThisTurn ?? 0) + 1;
+    }
   });
 }
