@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.23.5] — 2026-07-23
+
+### Fixed
+
+- **Doubled "Done when:" in the goal-draft Confirm dialog** (field
+  screenshot): models mimic the `/goal` syntax and start the contract text
+  with "Done when:" — the dialog then printed its own header plus the
+  model's, twice. `normalizeDraftContract` (pure, in goal-loop-core)
+  strips bare introducer lines and glued "Done when: " prefixes before
+  BOTH rendering and storage.
+
+### Changed
+
+- **Confirm dialog readability** — the contract now renders as a numbered
+  checklist (bullets renumbered 1..N sequentially) under a header that
+  names the count: "Done when — 7 checks:". Numbering also makes
+  reject-feedback citable ("item 3 is wrong"). Prose lines pass through
+  untouched; nothing is truncated — the Confirm gate stays fully
+  readable.
+- **Drafting prompt: contract sizing guidance** — 3–8 mechanical checks,
+  each verifiable with ONE command; the auditor must quote evidence for
+  EVERY item, so a 17-item contract means a slow audit and more shield
+  friction. Verify artifact integrity, not every sub-part. And: never
+  prefix the contract with "Done when:".
+
 ## [0.23.4] — 2026-07-23
 
 ### Fixed

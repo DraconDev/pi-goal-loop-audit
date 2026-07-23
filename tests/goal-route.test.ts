@@ -8,7 +8,7 @@
 import { test } from "node:test";
 import * as assert from "node:assert/strict";
 
-import { askUserQuestionAnswered, buildSeedGrillMessage, draftProposalBlock, goalArgsNeedDrafting, routeGoalArgs } from "../extensions/goal-loop-core.ts";
+import { askUserQuestionAnswered, buildSeedGrillMessage, draftContractItemCount, draftProposalBlock, goalArgsNeedDrafting, normalizeDraftContract, routeGoalArgs } from "../extensions/goal-loop-core.ts";
 
 test("empty args → draft", () => {
   assert.deepEqual(routeGoalArgs(""), { kind: "draft" });
@@ -133,4 +133,35 @@ test("/goal start routes as a subcommand with the objective as rest (v0.16.0)", 
   assert.deepEqual(routeGoalArgs("start"), { kind: "sub", name: "start", rest: "" });
   // exact-match still protects non-subcommand objectives
   assert.deepEqual(routeGoalArgs("startling discoveries in the logs").kind, "set");
+});
+
+// ---- v0.23.5: draft contract normalization (Confirm dialog readability) ----
+
+test("normalizeDraftContract: drops bare 'Done when:' introducer lines", () => {
+  const out = normalizeDraftContract("Done when:\n- tests pass\n- build clean");
+  assert.equal(out, "1. tests pass\n2. build clean");
+});
+
+test("normalizeDraftContract: drops 'Done when ALL of the following are true:' preamble", () => {
+  const out = normalizeDraftContract("Done when ALL of the following are true:\n- doc exists\n- table has 98 rows");
+  assert.equal(out, "1. doc exists\n2. table has 98 rows");
+});
+
+test("normalizeDraftContract: strips glued 'Done when: ' prefix on content line", () => {
+  assert.equal(normalizeDraftContract("Done when: tests pass"), "tests pass");
+});
+
+test("normalizeDraftContract: renumbers mixed bullets and existing numbers sequentially", () => {
+  const out = normalizeDraftContract("- alpha\n3. beta\n• gamma\n2) delta");
+  assert.equal(out, "1. alpha\n2. beta\n3. gamma\n4. delta");
+});
+
+test("normalizeDraftContract: prose lines pass through untouched", () => {
+  const out = normalizeDraftContract("Acceptance gate maps to the prior goal.\n- gates pass");
+  assert.equal(out, "Acceptance gate maps to the prior goal.\n1. gates pass");
+});
+
+test("draftContractItemCount counts numbered items only", () => {
+  assert.equal(draftContractItemCount("note\n1. a\n2. b"), 2);
+  assert.equal(draftContractItemCount("plain prose"), 0);
 });

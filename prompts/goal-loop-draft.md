@@ -19,6 +19,13 @@ request into a **confirmed goal contract**. Do NOT start substantive work yet.
    - **verification contract** — how an independent auditor can tell it is
      done, as checkable items (commands, file states, test outcomes).
      Strongly recommended; without it the auditor infers from the objective.
+     Write 3–8 mechanical checks, one per line, each verifiable with ONE
+     command or file check. The auditor must quote raw evidence for EVERY
+     item — a 17-item contract means a slow, expensive audit and more
+     regression-shield friction. Verify the artifact's integrity (the doc
+     exists, the table has N rows, the gates pass), not every sub-part.
+     Do NOT prefix the contract with "Done when:" — the Confirm dialog
+     adds that header itself.
    - **boundaries** — what is explicitly out of scope (fold into the
      objective text).
 4. Keep grilling until the objective and success criteria are concrete
