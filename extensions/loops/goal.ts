@@ -1000,8 +1000,8 @@ function loopPrompt(loop: LoopState, regressionNote: string, strategyNote: strin
     tmpl = fs.readFileSync(tmplPath, "utf-8");
   } catch {
     tmpl = metricless
-      ? `[LOOP ITERATION ${loop.iteration + 1}] Target: ${loop.target}. Metricless spec loop — make ONE real, inspectable change advancing the target. No cosmetic churn.`
-      : `[LOOP ITERATION ${loop.iteration + 1}] Target: ${loop.target}. Measure: ${loop.measureCmd} (${loop.direction}). Make ONE small change to improve the metric.`;
+      ? `[LOOP ITERATION ${loop.iteration + 1}] Target: ${loop.target}. Metricless spec loop — make ONE real, inspectable change advancing the target. No cosmetic churn. ${variantNote} ${interventionNote}`
+      : `[LOOP ITERATION ${loop.iteration + 1}] Target: ${loop.target}. Measure: ${loop.measureCmd} (${loop.direction}). Make ONE small change to improve the metric. ${interventionNote}`;
   }
   return tmpl
     .replace(/\$\{ITERATION\}/g, String(loop.iteration + 1))
