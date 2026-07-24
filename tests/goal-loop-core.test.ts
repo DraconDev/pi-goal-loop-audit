@@ -33,6 +33,8 @@ import {
   sumNewAssistantTokens,
   DEFAULT_TOKEN_LIMIT,
   writeGoalMd,
+  missingGllaTools,
+  GLLA_TOOL_NAMES,
 } from "../extensions/goal-loop-core.ts";
 import {
   BACKOFF_HARD_CAP_MS,
@@ -340,4 +342,44 @@ test("restore gate: autoresume=on overrides any reason", () => {
   for (const reason of ["startup", "new", "resume", "reload", "fork", undefined]) {
     assert.equal(shouldAutoResumeOnSessionStart(reason, true), true, String(reason));
   }
+});
+
+
+// =================================================================
+// v0.24.5: tool-visibility self-heal
+// =================================================================
+
+test("v0.24.5 missingGllaTools: empty active set returns all glla tool names", () => {
+  const missing = missingGllaTools([]);
+  assert.equal(missing.length, GLLA_TOOL_NAMES.length);
+  for (const name of GLLA_TOOL_NAMES) {
+    assert.ok(missing.includes(name), `expected ${name} in missing`);
+  }
+});
+
+test("v0.24.5 missingGllaTools: only glla tool names are tracked (no false positives on base tools)", () => {
+  const baseTools = ["read", "bash", "edit", "write", "ask_user_question", "todo", "advisor"];
+  const missing = missingGllaTools(baseTools);
+  assert.equal(missing.length, GLLA_TOOL_NAMES.length, "every glla tool is missing from base-only set");
+});
+
+test("v0.24.5 missingGllaTools: modlist-snapshot example (the real bug)", () => {
+  // The exact list modlist's default profile had before the v0.24.5 fix.
+  const modlistDefault = ["read", "bash", "edit", "write", "ask_user_question", "todo", "advisor"];
+  const missing = missingGllaTools(modlistDefault);
+  // Every glla tool was hidden — the bug.
+  assert.equal(missing.length, GLLA_TOOL_NAMES.length);
+  assert.ok(missing.includes("complete_goal"));
+  assert.ok(missing.includes("propose_loop_draft"));
+});
+
+test("v0.24.5 missingGllaTools: all tools present → empty missing list", () => {
+  const missing = missingGllaTools([...GLLA_TOOL_NAMES, "read", "bash"]);
+  assert.deepEqual(missing, []);
+});
+
+test("v0.24.5 missingGllaTools: missing just one tool → that single name", () => {
+  const allButOne = GLLA_TOOL_NAMES.filter((n) => n !== "complete_goal");
+  const missing = missingGllaTools(allButOne);
+  assert.deepEqual([...missing], ["complete_goal"]);
 });

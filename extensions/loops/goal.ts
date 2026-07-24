@@ -2730,6 +2730,29 @@ export default function (pi: ExtensionAPI): void {
   // "no active goal" if called).
   let registeredCtx: ExtensionContext | null = null;
 
+  // v0.24.5 tool-visibility self-heal: surface the notify exactly once
+  // per session so the user learns about an external allowlist once and
+  // can fix their profile to silence it.
+  let toolHealNotified = false;
+  function ensureAgentToolsActive(pi: ExtensionAPI, ctx: ExtensionContext): void {
+    try {
+      const active = pi.getActiveTools();
+      const missing = missingGllaTools(active);
+      if (missing.length === 0) return;
+      pi.setActiveTools([...active, ...missing]);
+      if (!toolHealNotified) {
+        toolHealNotified = true;
+        const list = missing.join(", ");
+        ctx.ui.notify(
+          `glla: ${missing.length} agent tool(s) were hidden by an external tool allowlist (e.g. a modlist profile) and have been re-activated (${list}). Add them to your allowlist profile to silence this.`,
+          "warning",
+        );
+      }
+    } catch {
+      // Older pi without getActiveTools/setActiveTools — nothing we can do.
+    }
+  }
+
   pi.on("message_start", async (event: any, _ctx: ExtensionContext) => {
     // v0.14.0 drafting floor: count real user replies while drafting. Our
     // own injected draft prompt arrives as a user message — skip that one.
@@ -2774,6 +2797,7 @@ export default function (pi: ExtensionAPI): void {
       registerAgentTools(pi, ctx);
       registeredCtx = ctx;
     }
+    ensureAgentToolsActive(pi, ctx);
     warnOnCommandCollision(ctx);
     warnIfAuditorProviderRisky(ctx);
     // Restore gate (v0.21.0): a fresh session ("startup"/"new", or a pi too
@@ -2854,6 +2878,7 @@ export default function (pi: ExtensionAPI): void {
       registerAgentTools(pi, ctx);
       registeredCtx = ctx;
     }
+    ensureAgentToolsActive(pi, ctx);
     // Nudge accounting: a supervising turn with zero tool calls is a nudge
     // (no real progress); 3 consecutive → pause. Tool-use turns reset it.
     if (isSupervising()) {
