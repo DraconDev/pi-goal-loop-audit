@@ -63,6 +63,7 @@ import {
   shouldAutoResumeOnSessionStart,
   statusLabel,
   writeGoalMd,
+  missingGllaTools,
 } from "../goal-loop-core.js";
 import { runGoalCompletionAuditor } from "../goal-loop-auditor.js";
 import {

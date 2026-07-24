@@ -1,5 +1,5 @@
 /**
- * pi-goal-list-loop-audit — v0.1.0
+ * pi-goal-list-loop-audit — v0.24.5
  * extensions/goal-loop-core.ts
  *
  * Shared types, state machine, JSONL persistence, helpers.
@@ -702,4 +702,45 @@ export type OwnerClaim = "claim" | "refresh" | "foreign";
 export function classifySessionCtx(ownerSession: unknown, ownerLive: boolean, sessionManager: unknown): OwnerClaim {
   if (!ownerSession || !ownerLive) return "claim";
   return sessionManager === ownerSession ? "refresh" : "foreign";
+}
+
+// =================================================================
+// v0.24.5: tool-visibility self-heal
+// =================================================================
+//
+// Root cause (INCIDENT-COMPLETION-BLACKHOLE-2026-07-23): external
+// extensions like pi-plugin-list-selector-modlist call pi.setActiveTools
+// with a frozen tool snapshot at session_start. When glla's session_start
+// handler runs BEFORE theirs (load order), our lazily-registered agent
+// tools get registered, briefly auto-activated, then wiped from the
+// model-facing active set on the very next pi.setActiveTools call from
+// modlist. Commands, widget, watchdog keep working (they don't go
+// through the tool registry), but every agent tool — complete_goal,
+// propose_loop_draft, etc. — answers "Tool not found" to the model.
+//
+// Self-heal: any handler that triggers registerAgentTools must also
+// ensure the registered tool names are present in pi.getActiveTools(),
+// re-adding any missing ones via pi.setActiveTools. Once per session,
+// notify the user naming the external allowlist as the likely culprit
+// so they can fix their profile once and silence it.
+
+export const GLLA_TOOL_NAMES = [
+  "complete_goal",
+  "pause_goal",
+  "complete_task",
+  "update_task_status",
+  "propose_goal_draft",
+  "propose_loop_draft",
+  "propose_loop_refine",
+  "list_add",
+  "list_activate",
+  "list_status",
+  "propose_task_list",
+] as const;
+
+export type GllaToolName = (typeof GLLA_TOOL_NAMES)[number];
+
+export function missingGllaTools(activeNames: readonly string[]): readonly GllaToolName[] {
+  const active = new Set(activeNames);
+  return GLLA_TOOL_NAMES.filter((n) => !active.has(n));
 }
