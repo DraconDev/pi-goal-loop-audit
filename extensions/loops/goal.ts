@@ -30,6 +30,8 @@ import {
   archivedGoalPath,
   buildTaskList,
   buildTaskSummary,
+  auditFeedbackExcerpt,
+  DEFAULT_AUDIT_FEEDBACK_CHARS,
   DEFAULT_TOKEN_LIMIT,
   mergeSettings,
   parseListImport,
@@ -1659,7 +1661,19 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       // goal the auditor can NEVER approve used to re-continue forever.
       // auditCap consecutive disapprovals → pause + notify, bounded and
       // surfaced like every other stop in this stack.
-      const auditCap = loadSettings(ctx.cwd).auditCap ?? 3;
+      const auditCap = settings.auditCap ?? 3;
+      const configuredFeedbackChars = settings.auditFeedbackChars;
+      const auditFeedbackChars = Number.isInteger(configuredFeedbackChars) && configuredFeedbackChars! >= 0
+        ? configuredFeedbackChars!
+        : DEFAULT_AUDIT_FEEDBACK_CHARS;
+      const auditFeedback = auditFeedbackExcerpt(result.output, auditFeedbackChars);
+      const auditFeedbackIsFull = auditFeedbackChars === 0 || result.output.length <= auditFeedbackChars;
+      const auditFeedbackLabel = auditFeedbackIsFull
+        ? "full report"
+        : `first ${auditFeedbackChars} chars`;
+      const auditFeedbackTruncationHint = auditFeedbackIsFull
+        ? ""
+        : `\n\nReport truncated at the configured limit. /goal status shows the full report; change future feedback with /glla auditfeedbackchars=N (0 = full report).`;
       const trailingDisapprovals = countTrailingDisapprovals(history);
       if (auditCap > 0 && trailingDisapprovals >= auditCap) {
         updateGoal({
@@ -1674,7 +1688,7 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
         return {
           content: [{
             type: "text",
-            text: `The auditor has now disapproved ${trailingDisapprovals} times in a row (cap ${auditCap}). The goal is PAUSED — continuing to re-attempt without addressing the pattern wastes tokens. Latest report (first 800 chars):\n${result.output.slice(0, 800)}\n\nDo not call complete_goal again. Summarize the repeated objections for the user and ask how to proceed (/goal status shows all reports; /goal resume resumes).`,
+            text: `The auditor has now disapproved ${trailingDisapprovals} times in a row (cap ${auditCap}). The goal is PAUSED — continuing to re-attempt without addressing the pattern wastes tokens. Latest report (${auditFeedbackLabel}):\n${auditFeedback}\n\nDo not call complete_goal again. Summarize the repeated objections for the user and ask how to proceed (/goal status shows all reports; /goal resume resumes).`,
           }],
           details: {},
         };
@@ -1689,7 +1703,7 @@ function registerAgentTools(pi: any, ctx: ExtensionContext): void {
       return {
         content: [{
           type: "text",
-          text: `Auditor disapproved. Report (first 800 chars):\n${result.output.slice(0, 800)}${noContractHint}`,
+          text: `Auditor disapproved. Report (${auditFeedbackLabel}):\n${auditFeedback}${auditFeedbackTruncationHint}${noContractHint}`,
         }],
         details: {},
       };
@@ -2260,6 +2274,9 @@ interface Settings {
   autoResume?: boolean;
   /** v0.24.2: pause the goal after N consecutive auditor disapprovals (0 = unlimited). Default 3. */
   auditCap?: number;
+  /** Maximum auditor-report characters returned to the executor after a
+   * disapproval (0 = full report). Default 800. */
+  auditFeedbackChars?: number;
   /** on → propose_* drafts activate WITHOUT the Confirm dialog and the
    * interview floor is skipped — the seed carries the intent (unattended
    * rigs). Default off: nothing activates before the user confirms. */
@@ -2271,6 +2288,7 @@ const DEFAULT_SETTINGS: Settings = {
   // pi, auditor follows), floor "high" — the auditor is the verification
   // gate, depth is worth more there than speed. /glla thinking= overrides.
   auditorThinkingLevel: undefined,
+  auditFeedbackChars: DEFAULT_AUDIT_FEEDBACK_CHARS,
 };
 
 // Two-tier config (v0.7.0): GLOBAL is the normal home — you set things once
@@ -2308,7 +2326,7 @@ function settingsProvenance(cwd: string): Record<keyof Settings, { value: unknow
   const glob = readSettingsFile(globalSettingsPath());
   const effective = loadSettings(cwd);
   const out: Record<string, { value: unknown; source: "project" | "global" | "default" }> = {};
-  const keys: Array<keyof Settings> = ["auditorModel", "auditorThinkingLevel", "notifyCmd", "tokenLimit", "wedgeAlertMinutes", "autoResume", "autoAcceptDrafts", "auditCap"];
+  const keys: Array<keyof Settings> = ["auditorModel", "auditorThinkingLevel", "notifyCmd", "tokenLimit", "wedgeAlertMinutes", "autoResume", "autoAcceptDrafts", "auditCap", "auditFeedbackChars"];
   for (const k of keys) {
     if ((proj as Record<string, unknown>)[k] !== undefined) out[k] = { value: (proj as any)[k], source: "project" };
     else if ((glob as Record<string, unknown>)[k] !== undefined) out[k] = { value: (glob as any)[k], source: "global" };
@@ -2408,6 +2426,7 @@ async function openSettingsUI(ctx: ExtensionContext): Promise<void> {
           `Notify command — ${show("notifyCmd", "(off)")}`,
           `Token limit per goal — ${show("tokenLimit", "(off)")}`,
           `Wedge alert minutes — ${show("wedgeAlertMinutes", `(${WEDGE_ALERT_DEFAULT_MINUTES}m default)`)}`,
+          `Audit feedback characters — ${show("auditFeedbackChars", `(${DEFAULT_AUDIT_FEEDBACK_CHARS} default)`)}`,
           "Done",
         ],
       );
@@ -2441,6 +2460,15 @@ async function openSettingsUI(ctx: ExtensionContext): Promise<void> {
           else if (!v.trim()) saveSettings("global", ctx.cwd, { wedgeAlertMinutes: undefined });
           else ctx.ui.notify(`Not a non-negative integer: ${v}`, "warning");
         }
+      } else if (choice.startsWith("Audit feedback")) {
+        const v = await ctx.ui.input("Auditor feedback returned to the executor (characters)", `non-negative integer; 0 = full report, empty = default ${DEFAULT_AUDIT_FEEDBACK_CHARS}`);
+        if (v !== undefined) {
+          const raw = v.trim();
+          const n = Number(raw);
+          if (/^\d+$/.test(raw) && Number.isSafeInteger(n)) saveSettings("global", ctx.cwd, { auditFeedbackChars: n });
+          else if (!v.trim()) saveSettings("global", ctx.cwd, { auditFeedbackChars: undefined });
+          else ctx.ui.notify(`Not a non-negative integer: ${v}`, "warning");
+        }
       }
     } catch {
       return;
@@ -2456,6 +2484,7 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
   //   /glla notify='cmd $1'      write to GLOBAL config
   //   /glla tokenlimit=2000000   write to GLOBAL config
   //   /glla wedgealert=30         hung-command alert minutes (0=off, unset=30)
+  //   /glla auditfeedbackchars=800 executor-visible disapproval report chars (0=full)
   //   /glla project model=...    write to PROJECT override (rare)
   //   /glla model=unset          remove key (from global; project model=unset for project)
   const trimmed = args.trim();
@@ -2480,6 +2509,7 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
         fmt("autoResume", "autoResume"),
         fmt("autoAcceptDrafts", "autoAccept"),
         fmt("auditCap", "auditCap"),
+        fmt("auditFeedbackChars", "auditFeedbackChars"),
         `\nglobal:  ${globalSettingsPath()}`,
         `project: ${projectSettingsPath(ctx.cwd)}`,
         `Set with: /glla key=value (global) · /glla project key=value (project override)`,
@@ -2565,6 +2595,19 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
           ctx.ui.notify(`auditcap must be a non-negative integer (0 = unlimited), got: ${value}`, "warning");
         }
       }
+    } else if (key === "auditfeedbackchars") {
+      if (["unset", "default"].includes(value)) {
+        patch.auditFeedbackChars = undefined;
+        changed = true;
+      } else {
+        const n = Number(value);
+        if (/^\d+$/.test(value) && Number.isSafeInteger(n)) {
+          patch.auditFeedbackChars = n;
+          changed = true;
+        } else {
+          ctx.ui.notify(`auditfeedbackchars must be a non-negative integer (0 = full report), got: ${value}`, "warning");
+        }
+      }
     } else if (key === "thinking" || key === "auditorthinkinglevel") {
       if (["off", "minimal", "low", "medium", "high", "xhigh"].includes(value)) {
         patch.auditorThinkingLevel = value as Settings["auditorThinkingLevel"];
@@ -2575,13 +2618,13 @@ async function cmdSettings(args: string, ctx: ExtensionContext): Promise<void> {
     }
   }
   if (!changed) {
-    ctx.ui.notify("Nothing changed. Use key=value (model, thinking, notify, tokenlimit, autoresume), optionally prefixed with 'project'.", "info");
+    ctx.ui.notify("Nothing changed. Use key=value (model, thinking, notify, tokenlimit, autoresume, auditcap, auditfeedbackchars), optionally prefixed with 'project'.", "info");
     return;
   }
   saveSettings(scope, ctx.cwd, patch);
   const effective = loadSettings(ctx.cwd);
   ctx.ui.notify(
-    `Saved to ${scope} config. Effective now: model=${effective.auditorModel ?? "(session model)"} thinking=${effective.auditorThinkingLevel ?? "(session)"} notify=${effective.notifyCmd ?? "(off)"} tokenLimit=${effective.tokenLimit ?? 0}${(effective.tokenLimit ?? 0) > 0 ? "" : " (off)"} autoResume=${effective.autoResume === true ? "on" : "off"}\n` +
+    `Saved to ${scope} config. Effective now: model=${effective.auditorModel ?? "(session model)"} thinking=${effective.auditorThinkingLevel ?? "(session)"} notify=${effective.notifyCmd ?? "(off)"} tokenLimit=${effective.tokenLimit ?? 0}${(effective.tokenLimit ?? 0) > 0 ? "" : " (off)"} autoResume=${effective.autoResume === true ? "on" : "off"} auditFeedbackChars=${effective.auditFeedbackChars ?? DEFAULT_AUDIT_FEEDBACK_CHARS}${(effective.auditFeedbackChars ?? DEFAULT_AUDIT_FEEDBACK_CHARS) === 0 ? " (full report)" : ""}\n` +
     `Note: the auditor runs without extensions — it must be a built-in provider, not an extension-registered one.`,
     "info",
   );
@@ -2697,6 +2740,7 @@ export default function (pi: ExtensionAPI): void {
       ["tokenlimit=", "per-goal token budget (0 = off): /glla tokenlimit=2000000"],
       ["autoresume=", "on: auto-resume held goals/loops in fresh sessions"],
       ["auditcap=", "N: pause goal after N consecutive auditor disapprovals (default 3, 0 = unlimited)"],
+      ["auditfeedbackchars=", `executor-visible disapproval report characters (default ${DEFAULT_AUDIT_FEEDBACK_CHARS}, 0 = full report)`],
       ["autoaccept=", "on: drafts activate without the Confirm dialog (unattended rigs)"],
       ["project", "write a project override: /glla project key=value"],
     ]),

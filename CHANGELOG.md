@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Auditor disapproval feedback is no longer permanently hard-capped at 800
+  characters. The new layered `auditFeedbackChars` setting preserves 800 as
+  its default and can be changed with `/glla auditfeedbackchars=N` globally
+  or per project; `0` returns the full report. The interactive settings UI,
+  headless display, completions, save summary, and executor-facing labels
+  all show the effective behavior.
+
 ## [0.24.5] — 2026-07-24
 
 ### Fixed — tool-visibility self-heal (modlist allowlist wipe)
