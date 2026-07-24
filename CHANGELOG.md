@@ -1,6 +1,40 @@
 # Changelog
 
-## [0.24.4] — 2026-07-23
+## [0.24.5] — 2026-07-24
+
+### Fixed — tool-visibility self-heal (modlist allowlist wipe)
+
+Root cause from `audit/INCIDENT-COMPLETION-BLACKHOLE-2026-07-23.md`:
+external extensions like `pi-plugin-list-selector-modlist` call
+`pi.setActiveTools(frozenSnapshot)` at every `session_start`. When glla's
+session_start handler runs before theirs (load order), our 11
+lazily-registered agent tools (`complete_goal`, `propose_loop_draft`,
+`propose_goal_draft`, `propose_loop_refine`, `pause_goal`, `complete_task`,
+`update_task_status`, `list_add`, `list_activate`, `list_status`,
+`propose_task_list`) are registered and briefly auto-activated, then
+wiped from the model-facing active set by modlist's allowlist. Commands,
+widget, watchdog keep working (they don't go through the tool registry),
+but every agent tool answers `"Tool not found"` to the model — silently.
+
+Forensics on the darklord session: 26 real `complete_goal` tool calls
+in the session jsonl, all answered `"Tool complete_goal not found"`
+(isError: true). The model was right about its own schema; the tool was
+genuinely absent.
+
+- **`GLLA_TOOL_NAMES`** and **`missingGllaTools(activeNames)`** added to
+  `goal-loop-core.ts` (pure, testable).
+- **`ensureAgentToolsActive(pi, ctx)`** added to `loops/goal.ts`: after
+  `registerAgentTools` and on every `agent_end`, diff our 11 tools
+  against `pi.getActiveTools()`; re-add any missing ones via
+  `pi.setActiveTools([...active, ...missing])`. Notify once per session
+  naming the likely culprit (external allowlist, e.g. modlist profile)
+  and the fix (add the tool names to the profile).
+- Old pi versions without `getActiveTools`/`setActiveTools` are handled
+  gracefully (try/catch, heal becomes a no-op).
+- 5 tests in `goal-loop-core.test.ts` (modlist-snapshot example,
+  empty/full active sets, single-tool missing, base-tool non-interference).
+- 244/244 tests pass (was 239); tsc clean.
+
 
 ### Changed — `/loop respec` ambiguity policy: friction scales with ambiguity
 
