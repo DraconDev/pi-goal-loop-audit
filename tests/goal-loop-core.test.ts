@@ -27,6 +27,8 @@ import {
   readGoalMd,
   readState,
   mergeSettings,
+  auditFeedbackExcerpt,
+  DEFAULT_AUDIT_FEEDBACK_CHARS,
   renderGoalMarkdown,
   shouldAutoResumeOnSessionStart,
   statusLabel,
@@ -271,6 +273,15 @@ test("mergeSettings: does not mutate the base", () => {
   const base = { a: 1 } as Record<string, unknown>;
   mergeSettings(base, { a: 5 });
   assert.equal(base.a, 1);
+});
+
+test("auditFeedbackExcerpt: bounds executor feedback at the configured character count", () => {
+  assert.equal(DEFAULT_AUDIT_FEEDBACK_CHARS, 800);
+  assert.equal(auditFeedbackExcerpt("abcdefghij", 6), "abcdef");
+});
+
+test("auditFeedbackExcerpt: zero returns the full auditor report", () => {
+  assert.equal(auditFeedbackExcerpt("full evidence report", 0), "full evidence report");
 });
 
 test("ensureDirs creates the .pi-glla tree", () => {

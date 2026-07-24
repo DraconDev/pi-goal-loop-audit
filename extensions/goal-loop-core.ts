@@ -287,6 +287,17 @@ export function mergeSettings<T extends Record<string, unknown>>(base: T, ...lay
   return out as T;
 }
 
+/** Backward-compatible default for executor-visible auditor feedback. */
+export const DEFAULT_AUDIT_FEEDBACK_CHARS = 800;
+
+/**
+ * Bound the auditor report returned to the executor after disapproval.
+ * A limit of 0 explicitly means "show the full report".
+ */
+export function auditFeedbackExcerpt(output: string, maxChars: number): string {
+  return maxChars === 0 ? output : output.slice(0, maxChars);
+}
+
 export interface ListItem {
   id: string;
   objective: string;

@@ -201,6 +201,7 @@ No external watchdog plugin needed.
 /glla wedgealert=30                  # hung-command alert minutes (default: 30, 0 = off)
 /glla autoresume=on                  # held goals/loops auto-resume in fresh sessions (unattended rigs)
 /glla auditcap=5                     # pause the goal after N consecutive auditor disapprovals (default 3, 0 = unlimited)
+/glla auditfeedbackchars=16000       # auditor report returned to the executor (default 800, 0 = full report)
 /glla autoaccept=on                  # drafts ACTIVATE without the Confirm dialog (unattended rigs)
 /glla project tokenlimit=500         # rare per-project override
 ```
@@ -210,6 +211,13 @@ your pi session model. When the session provider is extension-registered the
 auditor can't auth it — you're told once (info level) with the fix:
 `/glla model=provider/id`, set once, rarely touched again. The plugin never
 picks a model itself. Thinking follows the session too (floor `high`).
+
+On disapproval, the executor receives up to `auditFeedbackChars` characters
+from the auditor report (default 800, preserving the previous behavior).
+Increase it for multi-item `<evidence>` blocks and raw verification output,
+or set `/glla auditfeedbackchars=0` to return the full report. The complete
+report continues to be stored in audit history and is available through
+`/goal status`.
 
 `autoaccept=on` skips BOTH the Confirm dialog and the drafting interview
 floor — every `propose_*` draft (goal, list batch, loop, task list)
